@@ -1,5 +1,5 @@
-import type { Client, ClientAccountStatus } from '@/types/client'
-
+import type { Client } from '@/types/client'
+import type { AccountStatus } from '@/types/common'
 const FIRST_NAMES = [
   'علی',
   'محمد',
@@ -33,7 +33,7 @@ const LAST_NAMES = [
   'یوسفی',
 ]
 
-const ACCOUNT_STATUSES: ClientAccountStatus[] = [
+const ACCOUNT_STATUSES: AccountStatus[] = [
   'ACTIVE',
   'ACTIVE',
   'ACTIVE',

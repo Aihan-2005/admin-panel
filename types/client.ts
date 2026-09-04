@@ -1,18 +1,10 @@
-export type ClientAccountStatus = 'ACTIVE' | 'SUSPENDED'
+import type { AccountStatus } from '@/types/common'
 
 export interface Client {
   id: string
   fullName: string
   phone: string
   email: string
-  accountStatus: ClientAccountStatus
+  accountStatus: AccountStatus
   createdAt: string
-}
-
-export const CLIENT_ACCOUNT_STATUS_LABELS: Record<
-  ClientAccountStatus,
-  string
-> = {
-  ACTIVE: 'فعال',
-  SUSPENDED: 'مسدود',
 }
