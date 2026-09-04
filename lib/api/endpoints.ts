@@ -1,4 +1,19 @@
 export const API_ENDPOINTS = {
+
+    
+    
+
+  adminLogin:
+    '/admin/auth/login',
+
+  adminMe:
+    '/admin/auth/me',
+
+  adminLogout:
+    '/admin/auth/logout',
+
+
+    
   lawyers:
     '/admin/lawyers',
 
@@ -22,6 +37,9 @@ export const API_ENDPOINTS = {
   ) =>
     `/admin/lawyers/${id}/password`,
 
+  
+  
+
   clients:
     '/admin/clients',
 
@@ -34,6 +52,8 @@ export const API_ENDPOINTS = {
     id: string,
   ) =>
     `/admin/clients/${id}/account-status`,
+
+    
 
   tickets:
     '/admin/tickets',
@@ -53,9 +73,13 @@ export const API_ENDPOINTS = {
   ) =>
     `/admin/tickets/${id}/status`,
 
+    
+
   cases:
     '/admin/cases',
 
+  
+    
   soldAccounts:
     '/admin/sold-accounts',
 } as const
