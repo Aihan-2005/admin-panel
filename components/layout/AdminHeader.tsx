@@ -78,7 +78,7 @@ export function AdminHeader({
 
   const secondaryText =
     admin?.email ||
-    admin?.username ||
+  admin?.phone ||
     'مدیر سامانه'
 
   return (

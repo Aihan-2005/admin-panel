@@ -52,7 +52,8 @@ const TICKET_STATUSES =
     TICKET_STATUS_LABELS,
   ) as TicketStatus[]
 
-const STATUS_STYLES: Record<
+  
+  const STATUS_STYLES: Record<
   TicketStatus,
   string
 > = {
@@ -62,7 +63,10 @@ const STATUS_STYLES: Record<
   IN_PROGRESS:
     'border-amber-200 bg-amber-50 text-amber-700',
 
-  ANSWERED:
+  WAITING_FOR_LAWYER:
+    'border-violet-200 bg-violet-50 text-violet-700',
+
+  RESOLVED:
     'border-emerald-200 bg-emerald-50 text-emerald-700',
 
   CLOSED:

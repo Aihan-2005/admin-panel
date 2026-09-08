@@ -48,7 +48,10 @@ const STATUS_STYLES: Record<
   IN_PROGRESS:
     'border-amber-200 bg-amber-50 text-amber-700',
 
-  ANSWERED:
+  WAITING_FOR_LAWYER:
+    'border-violet-200 bg-violet-50 text-violet-700',
+
+  RESOLVED:
     'border-emerald-200 bg-emerald-50 text-emerald-700',
 
   CLOSED:
@@ -180,12 +183,17 @@ export default function TicketsPage() {
 
           return result
         },
-        {
-          OPEN: 0,
-          IN_PROGRESS: 0,
-          ANSWERED: 0,
-          CLOSED: 0,
-        },
+       {
+  OPEN: 0,
+
+  IN_PROGRESS: 0,
+
+  WAITING_FOR_LAWYER: 0,
+
+  RESOLVED: 0,
+
+  CLOSED: 0,
+},
       )
     }, [tickets])
 

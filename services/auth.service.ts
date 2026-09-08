@@ -1,173 +1,199 @@
-import { apiRequest } from '@/lib/api/client'
+import {
+  ApiError,
+  apiRequest,
+  clearAccessToken,
+  setAccessToken,
+} from '@/lib/api/client'
+
 import { API_ENDPOINTS } from '@/lib/api/endpoints'
-import { normalizeEntity } from '@/lib/api/normalize'
 
 import type {
   AdminLoginPayload,
   AdminUser,
+  UserRole,
+  VerificationState,
 } from '@/types/auth'
 
-const USE_MOCK_AUTH =
-  process.env.NEXT_PUBLIC_USE_MOCK_AUTH === 'true'
+import type {
+  AccountStatus,
+} from '@/types/common'
 
-const MOCK_AUTH_STORAGE_KEY =
-  'dadyar_admin_mock_session'
+interface BackendUser {
+  id: string
 
-const MOCK_ADMIN: AdminUser = {
-  id: 'mock-admin-1',
+  email: string | null
 
-  fullName: 'مدیر دادیار',
+  phone: string | null
 
-  email: 'admin@dadyar.local',
+  role: UserRole
 
-  username: 'admin',
+  status: AccountStatus
 
-  role: 'ADMIN',
-}
-
-
-
-function saveMockSession() {
-  if (typeof window === 'undefined') {
-    return
+  verification: {
+    email: VerificationState
+    phone: VerificationState
   }
 
-  window.localStorage.setItem(
-    MOCK_AUTH_STORAGE_KEY,
-    JSON.stringify(MOCK_ADMIN),
-  )
+  lastLoginAt:
+    | string
+    | null
 }
 
+interface LoginResponse {
+  success: boolean
 
+  data: {
+    user: BackendUser
 
-function getMockSession(): AdminUser | null {
-  if (typeof window === 'undefined') {
-    return null
+    accessToken: string
+
+    accessTokenExpiresIn: number
   }
+}
 
-  const value =
-    window.localStorage.getItem(
-      MOCK_AUTH_STORAGE_KEY,
+interface MeResponse {
+  success: boolean
+
+  data: {
+    user: BackendUser
+  }
+}
+
+function mapAdminUser(
+  user: BackendUser,
+): AdminUser {
+  if (
+    user.role !== 'ADMIN'
+  ) {
+    throw new ApiError(
+      'این حساب دسترسی مدیریت ندارد.',
+      403,
+      user,
     )
-
-  if (!value) {
-    return null
   }
 
+  return {
+    id: user.id,
+
+    email: user.email,
+
+    phone: user.phone,
+
+    role: 'ADMIN',
+
+    status: user.status,
+
+    verification:
+      user.verification,
+
+    lastLoginAt:
+      user.lastLoginAt,
+
+    fullName:
+      'مدیر دادیار',
+
+    username: null,
+  }
+}
+
+async function clearBackendSession() {
   try {
-    return JSON.parse(
-      value,
-    ) as AdminUser
-  } catch {
-    window.localStorage.removeItem(
-      MOCK_AUTH_STORAGE_KEY,
+    await apiRequest(
+      API_ENDPOINTS.authLogout,
+      {
+        method: 'POST',
+      },
+      {
+        auth: false,
+        retryOnUnauthorized:
+          false,
+      },
     )
-
-    return null
-  }
-}
-
-
-function removeMockSession() {
-  if (typeof window === 'undefined') {
-    return
+  } catch {
   }
 
-  window.localStorage.removeItem(
-    MOCK_AUTH_STORAGE_KEY,
-  )
+  clearAccessToken()
 }
-
-
 
 export async function loginAdmin(
   payload: AdminLoginPayload,
 ): Promise<AdminUser> {
+  const identifier =
+    payload.identifier.trim()
+
 
     
-  if (USE_MOCK_AUTH) {
-    await new Promise(
-      (resolve) =>
-        window.setTimeout(
-          resolve,
-          500,
-        ),
-    )
+  const credentials =
+    identifier.includes('@')
+      ? {
+          email:
+            identifier.toLowerCase(),
 
-    const identifier =
-      payload.identifier
-        .trim()
-        .toLowerCase()
+          password:
+            payload.password,
+        }
+      : {
+          phone:
+            identifier,
 
-    const isValidIdentifier =
-      identifier ===
-        'admin' ||
-      identifier ===
-        'admin@dadyar.local'
-
-    const isValidPassword =
-      payload.password ===
-      '12345678'
-
-    if (
-      !isValidIdentifier ||
-      !isValidPassword
-    ) {
-      throw new Error(
-        'نام کاربری یا رمز عبور اشتباه است.',
-      )
-    }
-
-    saveMockSession()
-
-    return MOCK_ADMIN
-  }
-
-
-  
-  await apiRequest<unknown>(
-    API_ENDPOINTS.adminLogin,
-    {
-      method: 'POST',
-
-      body: JSON.stringify(
-        payload,
-      ),
-    },
-  )
-
-  return getCurrentAdmin()
-}
-
-
-export async function getCurrentAdmin(): Promise<AdminUser> {
- 
-    
-  if (USE_MOCK_AUTH) {
-    const admin =
-      getMockSession()
-
-    if (!admin) {
-      const error =
-        new Error(
-          'Session وجود ندارد.',
-        ) as Error & {
-          status?: number
+          password:
+            payload.password,
         }
 
-      error.status = 401
+  const response =
+    await apiRequest<LoginResponse>(
+      API_ENDPOINTS.authLogin,
+      {
+        method: 'POST',
 
-      throw error
-    }
+        body: JSON.stringify(
+          credentials,
+        ),
 
-    return admin
+        cache: 'no-store',
+      },
+      {
+        auth: false,
+
+        retryOnUnauthorized:
+          false,
+      },
+    )
+
+  const token =
+    response.data
+      ?.accessToken
+
+  const user =
+    response.data?.user
+
+  if (!token || !user) {
+    throw new ApiError(
+      'پاسخ ورود از سرور معتبر نیست.',
+      500,
+      response,
+    )
   }
 
-  
-  
-  const payload =
-    await apiRequest<unknown>(
-      API_ENDPOINTS.adminMe,
+  setAccessToken(token)
+
+  try {
+    return mapAdminUser(
+      user,
+    )
+  } catch (error) {
+
+    
+    await clearBackendSession()
+
+    throw error
+  }
+}
+
+export async function getCurrentAdmin(): Promise<AdminUser> {
+  const response =
+    await apiRequest<MeResponse>(
+      API_ENDPOINTS.authMe,
       {
         method: 'GET',
 
@@ -175,28 +201,26 @@ export async function getCurrentAdmin(): Promise<AdminUser> {
       },
     )
 
-  return normalizeEntity<AdminUser>(
-    payload,
+  return mapAdminUser(
+    response.data.user,
   )
 }
 
-
-
 export async function logoutAdmin(): Promise<void> {
+  clearAccessToken()
 
-    
-  if (USE_MOCK_AUTH) {
-    removeMockSession()
-
-    return
-  }
-
-
-  
-  await apiRequest<void>(
-    API_ENDPOINTS.adminLogout,
+  await apiRequest(
+    API_ENDPOINTS.authLogout,
     {
       method: 'POST',
+
+      cache: 'no-store',
+    },
+    {
+      auth: false,
+
+      retryOnUnauthorized:
+        false,
     },
   )
 }

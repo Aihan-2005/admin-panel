@@ -14,7 +14,9 @@ import {
   ShieldAlert,
 } from 'lucide-react'
 
-import { updateLawyerPassword } from '@/services/lawyer.service'
+import {
+  updateLawyerPassword,
+} from '@/services/lawyer.service'
 
 interface LawyerPasswordSectionProps {
   lawyerId: string
@@ -34,11 +36,6 @@ export function LawyerPasswordSection({
     confirmPassword,
     setConfirmPassword,
   ] = useState('')
-
-  const [
-    forceChangeOnNextLogin,
-    setForceChangeOnNextLogin,
-  ] = useState(true)
 
   const [
     showPassword,
@@ -91,8 +88,8 @@ export function LawyerPasswordSection({
 
       return null
     }, [
-      confirmPassword,
       password,
+      confirmPassword,
     ])
 
   async function handleSubmit(
@@ -109,7 +106,7 @@ export function LawyerPasswordSection({
 
     const confirmed =
       window.confirm(
-        `رمز عبور ${lawyerName} تغییر کند؟ بهتر است کاربر در ورود بعدی مجبور به انتخاب رمز جدید شود.`,
+        `رمز عبور ${lawyerName} تغییر کند؟ تمام نشست‌های فعال این کاربر نیز از سمت سرور باطل می‌شوند.`,
       )
 
     if (!confirmed) {
@@ -126,8 +123,6 @@ export function LawyerPasswordSection({
         lawyerId,
         {
           password,
-
-          forceChangeOnNextLogin,
         },
       )
 
@@ -137,12 +132,8 @@ export function LawyerPasswordSection({
         '',
       )
 
-      setForceChangeOnNextLogin(
-        true,
-      )
-
       setSuccess(
-        'رمز عبور با موفقیت تغییر کرد.',
+        'رمز عبور تغییر کرد و نشست‌های قبلی کاربر باطل شدند.',
       )
     } catch (err) {
       setError(
@@ -156,7 +147,7 @@ export function LawyerPasswordSection({
   }
 
   return (
-    <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm shadow-zinc-100">
+    <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
       <div className="flex items-start gap-3">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-amber-700">
           <KeyRound
@@ -170,11 +161,8 @@ export function LawyerPasswordSection({
           </h2>
 
           <p className="mt-1 text-sm leading-6 text-zinc-500">
-            این اکشن مربوط به
-            حساب کاربری است و هیچ
-            تغییری در وضعیت
-            حرفه‌ای وکیل ایجاد
-            نمی‌کند.
+            رمز عبور جدید توسط
+            مدیر تعیین می‌شود.
           </p>
         </div>
       </div>
@@ -186,12 +174,10 @@ export function LawyerPasswordSection({
         />
 
         <span>
-          برای امنیت بیشتر، گزینه
-          اجبار به تغییر رمز در
-          ورود بعدی را فعال نگه
-          دارید و در بک‌اند نیز
-          sessionهای قبلی کاربر را
-          invalidate کنید.
+          بعد از تغییر رمز،
+          Backend تمام Refresh
+          Sessionهای قبلی این
+          حساب را revoke می‌کند.
         </span>
       </div>
 
@@ -225,8 +211,8 @@ export function LawyerPasswordSection({
             }
             onToggleVisibility={() =>
               setShowPassword(
-                (current) =>
-                  !current,
+                (value) =>
+                  !value,
               )
             }
           />
@@ -244,8 +230,8 @@ export function LawyerPasswordSection({
             }
             onToggleVisibility={() =>
               setShowPassword(
-                (current) =>
-                  !current,
+                (value) =>
+                  !value,
               )
             }
           />
@@ -259,38 +245,6 @@ export function LawyerPasswordSection({
           </p>
         )}
 
-        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
-          <input
-            type="checkbox"
-            checked={
-              forceChangeOnNextLogin
-            }
-            onChange={(
-              event,
-            ) =>
-              setForceChangeOnNextLogin(
-                event.target
-                  .checked,
-              )
-            }
-            className="mt-1 h-4 w-4 accent-blue-600"
-          />
-
-          <span>
-            <span className="block text-sm font-black text-zinc-800">
-              تغییر اجباری رمز در
-              ورود بعدی
-            </span>
-
-            <span className="mt-1 block text-xs leading-5 text-zinc-500">
-              بعد از ورود موفق،
-              وکیل باید رمز موقت
-              تعیین‌شده توسط ادمین
-              را تغییر دهد.
-            </span>
-          </span>
-        </label>
-
         <div className="flex justify-end">
           <button
             type="submit"
@@ -301,7 +255,7 @@ export function LawyerPasswordSection({
                 validationMessage,
               )
             }
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-zinc-900 px-5 text-sm font-black text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-zinc-900 px-5 text-sm font-black text-white transition hover:bg-zinc-800 disabled:opacity-50"
           >
             <Save
               size={16}
@@ -325,12 +279,17 @@ function PasswordField({
   onToggleVisibility,
 }: {
   label: string
+
   value: string
+
   onChange: (
     value: string,
   ) => void
+
   showPassword: boolean
-  onToggleVisibility: () => void
+
+  onToggleVisibility:
+    () => void
 }) {
   return (
     <label className="block">
@@ -346,9 +305,7 @@ function PasswordField({
               : 'password'
           }
           value={value}
-          onChange={(
-            event,
-          ) =>
+          onChange={(event) =>
             onChange(
               event.target
                 .value,
@@ -364,12 +321,7 @@ function PasswordField({
           onClick={
             onToggleVisibility
           }
-          className="absolute left-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
-          aria-label={
-            showPassword
-              ? 'مخفی کردن رمز'
-              : 'نمایش رمز'
-          }
+          className="absolute left-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-zinc-400 hover:bg-zinc-100"
         >
           {showPassword ? (
             <EyeOff

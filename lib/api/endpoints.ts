@@ -1,85 +1,65 @@
 export const API_ENDPOINTS = {
 
-    
-    
+  
+  
 
-  adminLogin:
-    '/admin/auth/login',
+  authLogin: '/auth/login',
 
-  adminMe:
-    '/admin/auth/me',
+  authRefresh: '/auth/refresh',
 
-  adminLogout:
-    '/admin/auth/logout',
+  authMe: '/auth/me',
 
+  authLogout: '/auth/logout',
 
-    
-  lawyers:
-    '/admin/lawyers',
+  
 
-  lawyer: (
-    id: string,
-  ) =>
+  dashboard: '/admin/dashboard',
+
+  
+
+  lawyers: '/admin/lawyers',
+
+  lawyer: (id: string) =>
     `/admin/lawyers/${id}`,
 
-  lawyerState: (
-    id: string,
-  ) =>
-    `/admin/lawyers/${id}/state`,
+  lawyerStatus: (id: string) =>
+    `/admin/lawyers/${id}/status`,
 
-  lawyerAccountStatus: (
-    id: string,
-  ) =>
+  lawyerAccountStatus: (id: string) =>
     `/admin/lawyers/${id}/account-status`,
 
-  lawyerPassword: (
-    id: string,
-  ) =>
+  lawyerPassword: (id: string) =>
     `/admin/lawyers/${id}/password`,
 
   
-  
 
-  clients:
-    '/admin/clients',
+  clients: '/admin/clients',
 
-  client: (
-    id: string,
-  ) =>
+  client: (id: string) =>
     `/admin/clients/${id}`,
 
-  clientAccountStatus: (
-    id: string,
-  ) =>
+  clientAccountStatus: (id: string) =>
     `/admin/clients/${id}/account-status`,
 
-    
-
-  tickets:
-    '/admin/tickets',
-
-  ticket: (
-    id: string,
-  ) =>
-    `/admin/tickets/${id}`,
-
-  ticketReply: (
-    id: string,
-  ) =>
-    `/admin/tickets/${id}/reply`,
-
-  ticketStatus: (
-    id: string,
-  ) =>
-    `/admin/tickets/${id}/status`,
-
-    
-
-  cases:
-    '/admin/cases',
+  clientPassword: (id: string) =>
+    `/admin/clients/${id}/password`,
 
   
-    
-  soldAccounts:
-    '/admin/sold-accounts',
+
+  tickets: '/admin/tickets',
+
+  ticket: (id: string) =>
+    `/admin/tickets/${id}`,
+
+  ticketStatus: (id: string) =>
+    `/admin/tickets/${id}/status`,
+
+  ticketMessages: (id: string) =>
+    `/admin/tickets/${id}/messages`,
+
+  ticketMessageAttachment: (
+    ticketId: string,
+    messageId: string,
+  ) =>
+    `/admin/tickets/${ticketId}/messages/${messageId}/attachment`,
 } as const

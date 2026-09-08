@@ -300,8 +300,8 @@ export default function LoginPage() {
             >
               <label className="block">
                 <span className="mb-2 block text-sm font-black text-slate-700">
-                  ایمیل یا نام
-                  کاربری
+                 شماره موبایل یا ایمیل
+
                 </span>
 
                 <div className="relative">
@@ -329,7 +329,7 @@ export default function LoginPage() {
                     disabled={
                       isSubmitting
                     }
-                    placeholder="admin@example.com"
+              placeholder="0912... یا admin@example.com"
                     className="h-12 w-full rounded-xl border border-slate-300 bg-white pr-11 pl-4 text-sm font-semibold text-slate-900 outline-none transition placeholder:font-normal placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-50"
                   />
                 </div>

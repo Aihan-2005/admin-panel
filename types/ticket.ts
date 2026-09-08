@@ -1,51 +1,87 @@
 export type TicketStatus =
   | 'OPEN'
   | 'IN_PROGRESS'
-  | 'ANSWERED'
+  | 'WAITING_FOR_LAWYER'
+  | 'RESOLVED'
   | 'CLOSED'
 
 export interface TicketMessage {
   id: string
+
   body: string
 
   senderType:
     | 'ADMIN'
-    | 'USER'
     | 'LAWYER'
-    | 'CLIENT'
-    | string
 
-  senderName?: string | null
+  senderId?:
+    | string
+    | null
+
+  senderName?:
+    | string
+    | null
+
+  attachmentId?:
+    | string
+    | null
 
   createdAt: string
 }
 
 export interface Ticket {
   id: string
+
   subject: string
 
-  description?: string | null
+  type?:
+    | 'BUG'
+    | 'SUGGESTION'
+    | 'OTHER'
+    | null
 
-  status: TicketStatus
-
-  requesterName?: string | null
-
-  requesterType?:
-    | 'LAWYER'
-    | 'CLIENT'
+  description?:
     | string
     | null
 
+  status: TicketStatus
+
+  requesterId?:
+    | string
+    | null
+
+  requesterName?:
+    | string
+    | null
+
+  requesterType:
+    | 'LAWYER'
+
   createdAt: string
 
-  updatedAt?: string | null
+  updatedAt?:
+    | string
+    | null
 
   messages?: TicketMessage[]
 }
 
-export const TICKET_STATUS_LABELS: Record<TicketStatus, string> = {
-  OPEN: 'باز',
-  IN_PROGRESS: 'در حال بررسی',
-  ANSWERED: 'پاسخ داده شده',
-  CLOSED: 'بسته',
+export const TICKET_STATUS_LABELS: Record<
+  TicketStatus,
+  string
+> = {
+  OPEN:
+    'باز',
+
+  IN_PROGRESS:
+    'در حال بررسی',
+
+  WAITING_FOR_LAWYER:
+    'در انتظار پاسخ وکیل',
+
+  RESOLVED:
+    'حل شده',
+
+  CLOSED:
+    'بسته',
 }
