@@ -14,19 +14,21 @@ import {
   ShieldAlert,
 } from 'lucide-react'
 
-import {
-  updateLawyerPassword,
-} from '@/services/lawyer.service'
+interface PasswordResetSectionProps {
+  title: string
 
-interface LawyerPasswordSectionProps {
-  lawyerId: string
-  lawyerName: string
+  subjectName: string
+
+  onReset: (
+    password: string,
+  ) => Promise<void>
 }
 
-export function LawyerPasswordSection({
-  lawyerId,
-  lawyerName,
-}: LawyerPasswordSectionProps) {
+export function PasswordResetSection({
+  title,
+  subjectName,
+  onReset,
+}: PasswordResetSectionProps) {
   const [
     password,
     setPassword,
@@ -43,8 +45,8 @@ export function LawyerPasswordSection({
   ] = useState(false)
 
   const [
-    isSaving,
-    setIsSaving,
+    saving,
+    setSaving,
   ] = useState(false)
 
   const [
@@ -63,7 +65,7 @@ export function LawyerPasswordSection({
       null,
     )
 
-  const validationMessage =
+  const validation =
     useMemo(() => {
       if (
         !password &&
@@ -79,34 +81,43 @@ export function LawyerPasswordSection({
         return 'رمز عبور باید حداقل ۸ کاراکتر باشد.'
       }
 
+      const bytes =
+        new TextEncoder().encode(
+          password,
+        ).length
+
+      if (bytes > 72) {
+        return 'رمز عبور بیش از حد طولانی است.'
+      }
+
       if (
         password !==
         confirmPassword
       ) {
-        return 'تکرار رمز عبور با رمز جدید یکسان نیست.'
+        return 'تکرار رمز عبور یکسان نیست.'
       }
 
       return null
     }, [
-      password,
       confirmPassword,
+      password,
     ])
 
-  async function handleSubmit(
-    event: FormEvent<HTMLFormElement>,
+  async function submit(
+    event: FormEvent,
   ) {
     event.preventDefault()
 
     if (
       !password ||
-      validationMessage
+      validation
     ) {
       return
     }
 
     const confirmed =
       window.confirm(
-        `رمز عبور ${lawyerName} تغییر کند؟ تمام نشست‌های فعال این کاربر نیز از سمت سرور باطل می‌شوند.`,
+        `رمز عبور ${subjectName} تغییر کند؟ نشست‌های فعال این کاربر از بین خواهند رفت.`,
       )
 
     if (!confirmed) {
@@ -114,16 +125,13 @@ export function LawyerPasswordSection({
     }
 
     try {
-      setIsSaving(true)
+      setSaving(true)
 
       setError(null)
       setSuccess(null)
 
-      await updateLawyerPassword(
-        lawyerId,
-        {
-          password,
-        },
+      await onReset(
+        password,
       )
 
       setPassword('')
@@ -133,7 +141,7 @@ export function LawyerPasswordSection({
       )
 
       setSuccess(
-        'رمز عبور تغییر کرد و نشست‌های قبلی کاربر باطل شدند.',
+        'رمز عبور با موفقیت تغییر کرد و نشست‌های قبلی کاربر باطل شدند.',
       )
     } catch (err) {
       setError(
@@ -142,42 +150,43 @@ export function LawyerPasswordSection({
           : 'تغییر رمز عبور ناموفق بود.',
       )
     } finally {
-      setIsSaving(false)
+      setSaving(false)
     }
   }
 
   return (
-    <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+    <section className="rounded-2xl border border-zinc-200 bg-white p-5">
       <div className="flex items-start gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-amber-700">
+        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-50 text-amber-700">
           <KeyRound
             size={20}
           />
         </div>
 
         <div>
-          <h2 className="font-black text-zinc-950">
-            تغییر رمز عبور وکیل
+          <h2 className="font-black">
+            {title}
           </h2>
 
-          <p className="mt-1 text-sm leading-6 text-zinc-500">
-            رمز عبور جدید توسط
-            مدیر تعیین می‌شود.
+          <p className="mt-1 text-sm text-zinc-500">
+            مدیر می‌تواند برای
+            حساب کاربر رمز جدید
+            تعیین کند.
           </p>
         </div>
       </div>
 
-      <div className="mt-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-6 text-amber-800">
+      <div className="mt-4 flex gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-6 text-amber-800">
         <ShieldAlert
           size={17}
-          className="mt-0.5 shrink-0"
+          className="mt-1 shrink-0"
         />
 
         <span>
-          بعد از تغییر رمز،
-          Backend تمام Refresh
-          Sessionهای قبلی این
-          حساب را revoke می‌کند.
+          پس از تغییر رمز،
+          تمام Refresh Sessionهای
+          فعال کاربر revoke
+          می‌شوند.
         </span>
       </div>
 
@@ -195,104 +204,99 @@ export function LawyerPasswordSection({
 
       <form
         onSubmit={
-          handleSubmit
+          submit
         }
         className="mt-5 space-y-4"
       >
         <div className="grid gap-4 md:grid-cols-2">
-          <PasswordField
+          <PasswordInput
             label="رمز عبور جدید"
             value={password}
-            onChange={
+            setValue={
               setPassword
             }
-            showPassword={
+            show={
               showPassword
             }
-            onToggleVisibility={() =>
+            toggle={() =>
               setShowPassword(
-                (value) =>
-                  !value,
+                (current) =>
+                  !current,
               )
             }
           />
 
-          <PasswordField
+          <PasswordInput
             label="تکرار رمز عبور"
             value={
               confirmPassword
             }
-            onChange={
+            setValue={
               setConfirmPassword
             }
-            showPassword={
+            show={
               showPassword
             }
-            onToggleVisibility={() =>
+            toggle={() =>
               setShowPassword(
-                (value) =>
-                  !value,
+                (current) =>
+                  !current,
               )
             }
           />
         </div>
 
-        {validationMessage && (
+        {validation && (
           <p className="text-xs font-bold text-red-600">
-            {
-              validationMessage
-            }
+            {validation}
           </p>
         )}
 
-        <div className="flex justify-end">
-          <button
-            type="submit"
-            disabled={
-              isSaving ||
-              !password ||
-              Boolean(
-                validationMessage,
-              )
-            }
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-zinc-900 px-5 text-sm font-black text-white transition hover:bg-zinc-800 disabled:opacity-50"
-          >
-            <Save
-              size={16}
-            />
+        <button
+          type="submit"
+          disabled={
+            saving ||
+            !password ||
+            Boolean(
+              validation,
+            )
+          }
+          className="inline-flex h-11 items-center gap-2 rounded-xl bg-zinc-900 px-5 text-sm font-black text-white disabled:opacity-50"
+        >
+          <Save
+            size={16}
+          />
 
-            {isSaving
-              ? 'در حال ذخیره...'
-              : 'تغییر رمز عبور'}
-          </button>
-        </div>
+          {saving
+            ? 'در حال تغییر...'
+            : 'تغییر رمز عبور'}
+        </button>
       </form>
     </section>
   )
 }
 
-function PasswordField({
+function PasswordInput({
   label,
   value,
-  onChange,
-  showPassword,
-  onToggleVisibility,
+  setValue,
+  show,
+  toggle,
 }: {
   label: string
 
   value: string
 
-  onChange: (
+  setValue: (
     value: string,
   ) => void
 
-  showPassword: boolean
+  show: boolean
 
-  onToggleVisibility:
-    () => void
+  toggle: () => void
 }) {
   return (
-    <label className="block">
+    <label>
       <span className="mb-2 block text-xs font-black text-zinc-600">
         {label}
       </span>
@@ -300,30 +304,31 @@ function PasswordField({
       <div className="relative">
         <input
           type={
-            showPassword
+            show
               ? 'text'
               : 'password'
           }
           value={value}
-          onChange={(event) =>
-            onChange(
+          onChange={(
+            event,
+          ) =>
+            setValue(
               event.target
                 .value,
             )
           }
           autoComplete="new-password"
-          placeholder="حداقل ۸ کاراکتر"
-          className="h-11 w-full rounded-xl border border-zinc-300 bg-white px-3 pl-11 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+          className="h-11 w-full rounded-xl border border-zinc-300 px-3 pl-11 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
         />
 
         <button
           type="button"
           onClick={
-            onToggleVisibility
+            toggle
           }
           className="absolute left-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-zinc-400 hover:bg-zinc-100"
         >
-          {showPassword ? (
+          {show ? (
             <EyeOff
               size={17}
             />

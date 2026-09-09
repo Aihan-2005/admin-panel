@@ -1,32 +1,28 @@
 'use client'
 
 import {
+  type ChangeEvent,
   type FormEvent,
   useCallback,
   useEffect,
-  useMemo,
+  useRef,
   useState,
 } from 'react'
 
 import Link from 'next/link'
 
 import {
-  useParams,
-} from 'next/navigation'
-
-import type { LucideIcon } from 'lucide-react'
-
-import {
   ArrowRight,
-  CheckCircle2,
-  Clock3,
-  Copy,
-  MessageSquareText,
+  Download,
+  FileText,
+  Mail,
+  Paperclip,
+  Phone,
   RefreshCcw,
   Save,
   Send,
-  ShieldCheck,
   UserRound,
+  X,
 } from 'lucide-react'
 
 import {
@@ -36,42 +32,38 @@ import {
 
 import {
   getTicket,
+  getTicketAttachmentUrl,
   replyToTicket,
   updateTicketStatus,
 } from '@/services/ticket.service'
 
 import {
   TICKET_STATUS_LABELS,
+  TICKET_TYPE_LABELS,
   type Ticket,
   type TicketMessage,
   type TicketStatus,
 } from '@/types/ticket'
 
+const MAX_FILE_SIZE =
+  2 * 1024 * 1024
+
+const ALLOWED_EXTENSIONS = [
+  'jpg',
+  'png',
+  'pdf',
+  'doc',
+  'docx',
+  'xls',
+  'xlsx',
+  'zip',
+  'rar',
+]
+
 const TICKET_STATUSES =
   Object.keys(
     TICKET_STATUS_LABELS,
   ) as TicketStatus[]
-
-  
-  const STATUS_STYLES: Record<
-  TicketStatus,
-  string
-> = {
-  OPEN:
-    'border-blue-200 bg-blue-50 text-blue-700',
-
-  IN_PROGRESS:
-    'border-amber-200 bg-amber-50 text-amber-700',
-
-  WAITING_FOR_LAWYER:
-    'border-violet-200 bg-violet-50 text-violet-700',
-
-  RESOLVED:
-    'border-emerald-200 bg-emerald-50 text-emerald-700',
-
-  CLOSED:
-    'border-zinc-200 bg-zinc-100 text-zinc-600',
-}
 
 function formatDate(
   value?: string | null,
@@ -80,79 +72,39 @@ function formatDate(
     return '—'
   }
 
-  const date = new Date(value)
-
-  if (
-    Number.isNaN(
-      date.getTime(),
-    )
-  ) {
-    return '—'
-  }
-
-  return date.toLocaleString(
+  return new Date(
+    value,
+  ).toLocaleString(
     'fa-IR',
     {
       dateStyle: 'medium',
+
       timeStyle: 'short',
     },
   )
 }
 
-function requesterTypeLabel(
-  type?: string | null,
+function fileExtension(
+  file: File,
 ) {
-  if (type === 'LAWYER') {
-    return 'وکیل'
-  }
-
-  if (type === 'CLIENT') {
-    return 'موکل'
-  }
-
-  if (type === 'ADMIN') {
-    return 'ادمین'
-  }
-
-  return type || 'نامشخص'
-}
-
-function senderLabel(
-  message: TicketMessage,
-) {
-  if (message.senderName) {
-    return message.senderName
-  }
-
-  if (
-    message.senderType ===
-    'ADMIN'
-  ) {
-    return 'ادمین'
-  }
-
-  if (
-    message.senderType ===
-    'LAWYER'
-  ) {
-    return 'وکیل'
-  }
-
-  if (
-    message.senderType ===
-    'CLIENT'
-  ) {
-    return 'موکل'
-  }
-
-  return 'کاربر'
+  return (
+    file.name
+      .split('.')
+      .pop()
+      ?.toLowerCase() ??
+    ''
+  )
 }
 
 export default function TicketDetailsPage() {
-  const { id } =
-    useParams<{
-      id: string
-    }>()
+  const ticketId =
+    typeof window !==
+    'undefined'
+      ? window.location.pathname
+          .split('/')
+          .filter(Boolean)
+          .pop() ?? ''
+      : ''
 
   const [
     ticket,
@@ -163,11 +115,6 @@ export default function TicketDetailsPage() {
     )
 
   const [
-    reply,
-    setReply,
-  ] = useState('')
-
-  const [
     selectedStatus,
     setSelectedStatus,
   ] =
@@ -176,24 +123,45 @@ export default function TicketDetailsPage() {
     )
 
   const [
-    isLoading,
-    setIsLoading,
+    reply,
+    setReply,
+  ] = useState('')
+
+  const [
+    attachment,
+    setAttachment,
+  ] =
+    useState<File | null>(
+      null,
+    )
+
+  const [
+    loading,
+    setLoading,
   ] = useState(true)
 
   const [
-    isRefreshing,
-    setIsRefreshing,
+    refreshing,
+    setRefreshing,
   ] = useState(false)
 
   const [
-    isReplying,
-    setIsReplying,
+    replying,
+    setReplying,
   ] = useState(false)
 
   const [
-    isUpdatingStatus,
-    setIsUpdatingStatus,
+    savingStatus,
+    setSavingStatus,
   ] = useState(false)
+
+  const [
+    downloadingId,
+    setDownloadingId,
+  ] =
+    useState<string | null>(
+      null,
+    )
 
   const [
     error,
@@ -211,22 +179,23 @@ export default function TicketDetailsPage() {
       null,
     )
 
-  const [
-    copied,
-    setCopied,
-  ] = useState(false)
+  const fileInputRef =
+    useRef<HTMLInputElement>(
+      null,
+    )
 
   const loadTicket =
     useCallback(
       async (
-        showRefreshState =
-          false,
+        refresh = false,
       ) => {
+        if (!ticketId) {
+          return
+        }
+
         try {
-          if (
-            showRefreshState
-          ) {
-            setIsRefreshing(
+          if (refresh) {
+            setRefreshing(
               true,
             )
           }
@@ -235,7 +204,7 @@ export default function TicketDetailsPage() {
 
           const data =
             await getTicket(
-              id,
+              ticketId,
             )
 
           setTicket(data)
@@ -250,37 +219,123 @@ export default function TicketDetailsPage() {
               : 'خطا در دریافت تیکت',
           )
         } finally {
-          setIsLoading(false)
+          setLoading(false)
 
-          setIsRefreshing(
+          setRefreshing(
             false,
           )
         }
       },
-      [id],
+      [ticketId],
     )
 
   useEffect(() => {
     void loadTicket()
   }, [loadTicket])
 
-  const messages =
-    useMemo(() => {
-      return [
-        ...(ticket?.messages ??
-          []),
-      ].sort(
-        (a, b) =>
-          new Date(
-            a.createdAt,
-          ).getTime() -
-          new Date(
-            b.createdAt,
-          ).getTime(),
-      )
-    }, [ticket?.messages])
+  function handleFileChange(
+    event: ChangeEvent<HTMLInputElement>,
+  ) {
+    const file =
+      event.target.files?.[0]
 
-  async function handleStatusUpdate() {
+    if (!file) {
+      return
+    }
+
+    setError(null)
+
+    if (
+      file.size >
+      MAX_FILE_SIZE
+    ) {
+      setError(
+        'حداکثر حجم فایل ۲ مگابایت است.',
+      )
+
+      event.target.value =
+        ''
+
+      return
+    }
+
+    if (
+      !ALLOWED_EXTENSIONS.includes(
+        fileExtension(
+          file,
+        ),
+      )
+    ) {
+      setError(
+        'فرمت فایل مجاز نیست.',
+      )
+
+      event.target.value =
+        ''
+
+      return
+    }
+
+    setAttachment(file)
+  }
+
+  function removeAttachment() {
+    setAttachment(null)
+
+    if (
+      fileInputRef.current
+    ) {
+      fileInputRef.current.value =
+        ''
+    }
+  }
+
+  async function handleReply(
+    event: FormEvent,
+  ) {
+    event.preventDefault()
+
+    if (
+      !ticket ||
+      !reply.trim()
+    ) {
+      return
+    }
+
+    try {
+      setReplying(true)
+
+      setError(null)
+      setSuccess(null)
+
+      const updated =
+        await replyToTicket(
+          ticket.id,
+          reply,
+          attachment,
+        )
+
+      setTicket(updated)
+
+      setReply('')
+
+      removeAttachment()
+
+      setSuccess(
+        'پاسخ با موفقیت ارسال شد.',
+      )
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'ارسال پاسخ ناموفق بود.',
+      )
+    } finally {
+      setReplying(false)
+    }
+  }
+
+  async function saveStatus() {
     if (
       !ticket ||
       selectedStatus ===
@@ -290,12 +345,11 @@ export default function TicketDetailsPage() {
     }
 
     try {
-      setIsUpdatingStatus(
+      setSavingStatus(
         true,
       )
 
       setError(null)
-      setSuccess(null)
 
       const updated =
         await updateTicketStatus(
@@ -310,93 +364,72 @@ export default function TicketDetailsPage() {
       )
 
       setSuccess(
-        'وضعیت تیکت با موفقیت تغییر کرد.',
+        'وضعیت تیکت بروزرسانی شد.',
       )
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : 'تغییر وضعیت تیکت ناموفق بود.',
+          : 'تغییر وضعیت ناموفق بود.',
       )
     } finally {
-      setIsUpdatingStatus(
+      setSavingStatus(
         false,
       )
     }
   }
 
-  async function handleReply(
-    event: FormEvent<HTMLFormElement>,
+  async function openAttachment(
+    message: TicketMessage,
   ) {
-    event.preventDefault()
-
-    const body =
-      reply.trim()
-
     if (
       !ticket ||
-      !body
+      !message.attachmentId
     ) {
       return
     }
 
     try {
-      setIsReplying(true)
+      setDownloadingId(
+        message.id,
+      )
 
       setError(null)
-      setSuccess(null)
 
-      const updated =
-        await replyToTicket(
+      const url =
+        await getTicketAttachmentUrl(
           ticket.id,
-          body,
+          message.id,
         )
 
-      setTicket(updated)
+      const anchor =
+        document.createElement(
+          'a',
+        )
 
-      setSelectedStatus(
-        updated.status,
-      )
+      anchor.href = url
 
-      setReply('')
+      anchor.target =
+        '_blank'
 
-      setSuccess(
-        'پاسخ با موفقیت برای کاربر ارسال شد.',
-      )
+      anchor.rel =
+        'noopener noreferrer'
+
+      anchor.click()
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : 'ارسال پاسخ ناموفق بود.',
+          : 'دریافت فایل ناموفق بود.',
       )
     } finally {
-      setIsReplying(false)
+      setDownloadingId(
+        null,
+      )
     }
   }
 
-  async function copyTicketId() {
-    if (!ticket) {
-      return
-    }
-
-    try {
-      await navigator.clipboard.writeText(
-        ticket.id,
-      )
-
-      setCopied(true)
-
-      window.setTimeout(
-        () =>
-          setCopied(false),
-        1500,
-      )
-    } catch {
-      setCopied(false)
-    }
-  }
-
-  if (isLoading) {
+  if (loading) {
     return (
       <LoadingState label="در حال دریافت تیکت..." />
     )
@@ -413,244 +446,260 @@ export default function TicketDetailsPage() {
     )
   }
 
+  const messages =
+    [
+      ...(ticket.messages ??
+        []),
+    ].sort(
+      (a, b) =>
+        new Date(
+          a.createdAt,
+        ).getTime() -
+        new Date(
+          b.createdAt,
+        ).getTime(),
+    )
+
   return (
     <div
       dir="rtl"
       className="mx-auto max-w-6xl space-y-6"
     >
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0">
+        <div>
           <Link
             href="/tickets"
-            className="mb-3 inline-flex items-center gap-1 text-sm font-black text-blue-700 transition hover:text-blue-900"
+            className="mb-3 inline-flex items-center gap-1 text-sm font-black text-blue-700"
           >
             <ArrowRight
               size={16}
             />
+
             بازگشت به تیکت‌ها
           </Link>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="max-w-3xl text-2xl font-black leading-9 text-zinc-950">
-              {
-                ticket.subject
-              }
-            </h1>
+          <h1 className="text-2xl font-black text-zinc-950">
+            {
+              ticket.subject
+            }
+          </h1>
 
-            <TicketStatusBadge
-              status={
-                ticket.status
-              }
-            />
-          </div>
-
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-zinc-400">
+          <div className="mt-2 flex flex-wrap gap-2 text-xs text-zinc-500">
             <span>
-              شناسه تیکت:
-            </span>
-
-            <span
-              dir="ltr"
-              className="font-bold text-zinc-600"
-            >
-              {ticket.id}
-            </span>
-
-            <button
-              type="button"
-              onClick={
-                copyTicketId
+              {
+                TICKET_STATUS_LABELS[
+                  ticket.status
+                ]
               }
-              className="inline-flex items-center gap-1 rounded-lg px-2 py-1 font-bold text-blue-700 transition hover:bg-blue-50"
-            >
-              {copied ? (
-                <CheckCircle2
-                  size={14}
-                />
-              ) : (
-                <Copy
-                  size={14}
-                />
-              )}
+            </span>
 
-              {copied
-                ? 'کپی شد'
-                : 'کپی'}
-            </button>
+            {ticket.type && (
+              <>
+                <span>
+                  •
+                </span>
+
+                <span>
+                  {
+                    TICKET_TYPE_LABELS[
+                      ticket.type
+                    ]
+                  }
+                </span>
+              </>
+            )}
+
+            <span>
+              •
+            </span>
+
+            <span>
+              {formatDate(
+                ticket.createdAt,
+              )}
+            </span>
           </div>
         </div>
 
         <button
           type="button"
+          disabled={
+            refreshing
+          }
           onClick={() =>
             void loadTicket(
               true,
             )
           }
-          disabled={
-            isRefreshing
-          }
-          className="inline-flex h-10 items-center justify-center gap-2 self-start rounded-xl border border-zinc-200 bg-white px-3 text-xs font-black text-zinc-700 transition hover:bg-zinc-50 disabled:opacity-50"
+          className="inline-flex h-10 items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 text-sm font-bold"
         >
           <RefreshCcw
-            size={15}
+            size={16}
             className={
-              isRefreshing
+              refreshing
                 ? 'animate-spin'
                 : ''
             }
           />
+
           بروزرسانی
         </button>
       </div>
 
       {error && (
         <ErrorState
-          message={error}
+          message={
+            error
+          }
         />
       )}
 
       {success && (
-        <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-black text-emerald-700">
-          <CheckCircle2
-            size={18}
-          />
-
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-700">
           {success}
         </div>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MetaCard
-          icon={UserRound}
-          label="درخواست‌دهنده"
-          value={
-            ticket.requesterName ||
-            'نامشخص'
-          }
-          secondary={requesterTypeLabel(
-            ticket.requesterType,
-          )}
-        />
-
-        <MetaCard
+      <div className="grid gap-4 md:grid-cols-3">
+        <InfoCard
+          title="درخواست‌دهنده"
           icon={
-            MessageSquareText
+            <UserRound
+              size={18}
+            />
           }
-          label="تعداد پیام‌ها"
-          value={new Intl.NumberFormat(
-            'fa-IR',
-          ).format(
-            messages.length,
-          )}
-          secondary="پیام ثبت‌شده"
-        />
+        >
+          <div className="font-black">
+            {ticket.requesterName ||
+              'وکیل'}
+          </div>
+        </InfoCard>
 
-        <MetaCard
-          icon={Clock3}
-          label="تاریخ ایجاد"
-          value={formatDate(
-            ticket.createdAt,
-          )}
-        />
+        <InfoCard
+          title="شماره تماس"
+          icon={
+            <Phone
+              size={18}
+            />
+          }
+        >
+          <div dir="ltr">
+            {ticket.requesterPhone ||
+              '—'}
+          </div>
+        </InfoCard>
 
-        <MetaCard
-          icon={RefreshCcw}
-          label="آخرین بروزرسانی"
-          value={formatDate(
-            ticket.updatedAt ??
-              ticket.createdAt,
-          )}
-        />
+        <InfoCard
+          title="ایمیل"
+          icon={
+            <Mail
+              size={18}
+            />
+          }
+        >
+          <div
+            dir="ltr"
+            className="break-all"
+          >
+            {ticket.requesterEmail ||
+              '—'}
+          </div>
+        </InfoCard>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_330px]">
-        <div className="space-y-6">
-          <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm shadow-zinc-100">
-            <div className="flex items-center gap-2">
-              <MessageSquareText
-                size={19}
-                className="text-blue-700"
-              />
+        <div className="space-y-5">
+          <section className="rounded-2xl border border-zinc-200 bg-white p-5">
+            <h2 className="font-black">
+              گفتگو
+            </h2>
 
-              <h2 className="font-black text-zinc-950">
-                متن اولیه تیکت
-              </h2>
-            </div>
+            <div className="mt-5 space-y-3">
+              {messages.map(
+                (message) => (
+                  <div
+                    key={
+                      message.id
+                    }
+                    className={`rounded-2xl border p-4 ${
+                      message.senderType ===
+                      'ADMIN'
+                        ? 'mr-auto border-blue-200 bg-blue-50'
+                        : 'ml-auto border-zinc-200 bg-zinc-50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-xs font-black text-zinc-700">
+                        {message.senderName ||
+                          (message.senderType ===
+                          'ADMIN'
+                            ? 'ادمین'
+                            : ticket.requesterName)}
+                      </span>
 
-            <div className="mt-4 min-h-20 whitespace-pre-wrap rounded-2xl bg-zinc-50 p-4 text-sm leading-8 text-zinc-700">
-              {ticket.description ||
-                'برای این تیکت توضیح اولیه‌ای ثبت نشده است.'}
-            </div>
-          </section>
+                      <span className="text-xs text-zinc-400">
+                        {formatDate(
+                          message.createdAt,
+                        )}
+                      </span>
+                    </div>
 
-          <section className="space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="font-black text-zinc-950">
-                گفتگو
-              </h2>
+                    <div className="mt-3 whitespace-pre-wrap text-sm leading-7 text-zinc-800">
+                      {
+                        message.body
+                      }
+                    </div>
 
-              <span className="text-xs font-bold text-zinc-400">
-                {new Intl.NumberFormat(
-                  'fa-IR',
-                ).format(
-                  messages.length,
-                )}{' '}
-                پیام
-              </span>
-            </div>
+                    {message.attachmentId && (
+                      <button
+                        type="button"
+                        disabled={
+                          downloadingId ===
+                          message.id
+                        }
+                        onClick={() =>
+                          void openAttachment(
+                            message,
+                          )
+                        }
+                        className="mt-4 inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-white px-3 py-2 text-xs font-black text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                      >
+                        <Download
+                          size={
+                            15
+                          }
+                        />
 
-            {messages.length >
-            0 ? (
-              <div className="space-y-3">
-                {messages.map(
-                  (message) => (
-                    <MessageBubble
-                      key={
+                        {downloadingId ===
                         message.id
-                      }
-                      message={
-                        message
-                      }
-                    />
-                  ),
-                )}
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-dashed border-zinc-300 bg-white p-8 text-center text-sm text-zinc-400">
-                هنوز پیامی برای
-                این تیکت ثبت
-                نشده است.
-              </div>
-            )}
+                          ? 'در حال دریافت...'
+                          : 'مشاهده / دانلود فایل'}
+                      </button>
+                    )}
+                  </div>
+                ),
+              )}
+
+              {messages.length ===
+                0 && (
+                <div className="py-8 text-center text-sm text-zinc-400">
+                  پیامی وجود ندارد.
+                </div>
+              )}
+            </div>
           </section>
 
           <form
             onSubmit={
               handleReply
             }
-            className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm shadow-zinc-100"
+            className="rounded-2xl border border-zinc-200 bg-white p-5"
           >
-            <div className="flex items-center justify-between gap-3">
-              <label
-                htmlFor="ticket-reply"
-                className="font-black text-zinc-950"
-              >
-                پاسخ ادمین
-              </label>
-
-              <span className="text-xs font-bold text-zinc-400">
-                {new Intl.NumberFormat(
-                  'fa-IR',
-                ).format(
-                  reply.length,
-                )}{' '}
-                کاراکتر
-              </span>
-            </div>
+            <h2 className="font-black">
+              ارسال پاسخ
+            </h2>
 
             <textarea
-              id="ticket-reply"
               value={reply}
               onChange={(
                 event,
@@ -661,71 +710,121 @@ export default function TicketDetailsPage() {
                 )
               }
               rows={6}
-              maxLength={4000}
-              placeholder="پاسخ دقیق و کامل را برای کاربر بنویسید..."
-              className="mt-3 w-full resize-y rounded-2xl border border-zinc-300 p-4 text-sm leading-8 outline-none transition placeholder:text-zinc-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              maxLength={5000}
+              disabled={
+                ticket.status ===
+                'CLOSED'
+              }
+              placeholder="متن پاسخ ادمین..."
+              className="mt-4 w-full resize-y rounded-xl border border-zinc-300 p-4 text-sm leading-7 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-zinc-100"
             />
 
-            <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-xs leading-5 text-zinc-400">
-                پاسخ بعد از ارسال
-                به تاریخچه همین
-                تیکت اضافه می‌شود.
-              </p>
+            <div className="mt-4">
+              <input
+                ref={
+                  fileInputRef
+                }
+                type="file"
+                accept=".jpg,.png,.pdf,.doc,.docx,.xls,.xlsx,.zip,.rar"
+                onChange={
+                  handleFileChange
+                }
+                disabled={
+                  ticket.status ===
+                  'CLOSED'
+                }
+                className="hidden"
+                id="ticket-attachment"
+              />
 
+              {!attachment ? (
+                <label
+                  htmlFor="ticket-attachment"
+                  className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-sm font-bold text-zinc-700 hover:bg-zinc-50"
+                >
+                  <Paperclip
+                    size={17}
+                  />
+
+                  افزودن فایل
+                </label>
+              ) : (
+                <div className="flex max-w-lg items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <FileText
+                      size={18}
+                      className="shrink-0 text-blue-600"
+                    />
+
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-bold">
+                        {
+                          attachment.name
+                        }
+                      </div>
+
+                      <div className="text-xs text-zinc-400">
+                        {(
+                          attachment.size /
+                          1024
+                        ).toFixed(
+                          0,
+                        )}{' '}
+                        KB
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={
+                      removeAttachment
+                    }
+                    className="rounded-lg p-2 text-red-600 hover:bg-red-50"
+                  >
+                    <X
+                      size={16}
+                    />
+                  </button>
+                </div>
+              )}
+
+              <p className="mt-2 text-xs leading-5 text-zinc-400">
+                حداکثر ۲ مگابایت؛
+                JPG، PNG، PDF،
+                DOC، DOCX، XLS،
+                XLSX، ZIP و RAR
+              </p>
+            </div>
+
+            <div className="mt-5 flex justify-end">
               <button
                 type="submit"
                 disabled={
-                  isReplying ||
+                  replying ||
                   !reply.trim() ||
                   ticket.status ===
                     'CLOSED'
                 }
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-black text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-11 items-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-black text-white hover:bg-blue-700 disabled:opacity-50"
               >
                 <Send
-                  size={16}
+                  size={17}
                 />
 
-                {isReplying
+                {replying
                   ? 'در حال ارسال...'
                   : 'ارسال پاسخ'}
               </button>
             </div>
-
-            {ticket.status ===
-              'CLOSED' && (
-              <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-bold leading-5 text-amber-700">
-                این تیکت بسته
-                است. برای ارسال
-                پاسخ ابتدا وضعیت
-                آن را از پنل
-                مدیریت وضعیت
-                تغییر دهید.
-              </div>
-            )}
           </form>
         </div>
 
-        <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start">
-          <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm shadow-zinc-100">
-            <div className="flex items-center gap-2">
-              <ShieldCheck
-                size={19}
-                className="text-zinc-700"
-              />
-
-              <h2 className="font-black text-zinc-950">
-                مدیریت وضعیت
-              </h2>
-            </div>
-
-            <p className="mt-2 text-xs leading-6 text-zinc-500">
-              وضعیت پشتیبانی
-              این تیکت را مستقل
-              از متن پاسخ مدیریت
-              کنید.
-            </p>
+        <aside className="space-y-4">
+          <section className="rounded-2xl border border-zinc-200 bg-white p-5">
+            <h2 className="font-black">
+              مدیریت وضعیت
+            </h2>
 
             <select
               value={
@@ -739,21 +838,17 @@ export default function TicketDetailsPage() {
                     .value as TicketStatus,
                 )
               }
-              className="mt-4 h-11 w-full rounded-xl border border-zinc-300 bg-white px-3 text-sm font-bold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              className="mt-4 h-11 w-full rounded-xl border border-zinc-300 bg-white px-3 text-sm"
             >
               {TICKET_STATUSES.map(
-                (status) => (
+                (item) => (
                   <option
-                    key={
-                      status
-                    }
-                    value={
-                      status
-                    }
+                    key={item}
+                    value={item}
                   >
                     {
                       TICKET_STATUS_LABELS[
-                        status
+                        item
                       ]
                     }
                   </option>
@@ -763,55 +858,53 @@ export default function TicketDetailsPage() {
 
             <button
               type="button"
-              onClick={
-                handleStatusUpdate
+              onClick={() =>
+                void saveStatus()
               }
               disabled={
-                isUpdatingStatus ||
+                savingStatus ||
                 selectedStatus ===
                   ticket.status
               }
-              className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-zinc-900 px-4 text-sm font-black text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+              className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-zinc-900 text-sm font-black text-white disabled:opacity-50"
             >
               <Save
                 size={16}
               />
 
-              {isUpdatingStatus
-                ? 'در حال ذخیره...'
-                : 'ذخیره وضعیت'}
+              ذخیره وضعیت
             </button>
           </section>
 
-          <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm shadow-zinc-100">
-            <h2 className="font-black text-zinc-950">
+          <section className="rounded-2xl border border-zinc-200 bg-white p-5">
+            <h2 className="font-black">
               اطلاعات تیکت
             </h2>
 
             <dl className="mt-4 space-y-3 text-sm">
-              <InfoRow
-                label="نام درخواست‌دهنده"
+              <Row
+                label="شناسه"
                 value={
-                  ticket.requesterName ||
-                  'نامشخص'
+                  ticket.id
                 }
+                ltr
               />
 
-              <InfoRow
-                label="نوع درخواست‌دهنده"
-                value={requesterTypeLabel(
-                  ticket.requesterType,
+              <Row
+                label="تعداد پیام"
+                value={String(
+                  messages.length,
                 )}
               />
 
-              <InfoRow
+              <Row
                 label="تاریخ ایجاد"
                 value={formatDate(
                   ticket.createdAt,
                 )}
               />
 
-              <InfoRow
+              <Row
                 label="آخرین تغییر"
                 value={formatDate(
                   ticket.updatedAt ??
@@ -826,134 +919,58 @@ export default function TicketDetailsPage() {
   )
 }
 
-function TicketStatusBadge({
-  status,
+function InfoCard({
+  title,
+  icon,
+  children,
 }: {
-  status: TicketStatus
+  title: string
+
+  icon: React.ReactNode
+
+  children:
+    React.ReactNode
 }) {
   return (
-    <span
-      className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${STATUS_STYLES[status]}`}
-    >
-      {
-        TICKET_STATUS_LABELS[
-          status
-        ]
-      }
-    </span>
-  )
-}
+    <section className="rounded-2xl border border-zinc-200 bg-white p-4">
+      <div className="flex items-center gap-2 text-xs font-bold text-zinc-500">
+        {icon}
 
-function MetaCard({
-  icon: Icon,
-  label,
-  value,
-  secondary,
-}: {
-  icon: LucideIcon
-  label: string
-  value: string
-  secondary?: string
-}) {
-  return (
-    <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm shadow-zinc-100">
-      <div className="flex items-start gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
-          <Icon size={19} />
-        </div>
-
-        <div className="min-w-0">
-          <p className="text-xs font-bold text-zinc-500">
-            {label}
-          </p>
-
-          <p className="mt-1 break-words text-sm font-black text-zinc-900">
-            {value}
-          </p>
-
-          {secondary && (
-            <p className="mt-0.5 text-xs text-zinc-400">
-              {secondary}
-            </p>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function MessageBubble({
-  message,
-}: {
-  message: TicketMessage
-}) {
-  const isAdmin =
-    message.senderType ===
-    'ADMIN'
-
-  return (
-    <article
-      className={`max-w-3xl rounded-2xl border p-4 shadow-sm ${
-        isAdmin
-          ? 'mr-auto border-blue-200 bg-blue-50/70 shadow-blue-100/50'
-          : 'ml-auto border-zinc-200 bg-white shadow-zinc-100'
-      }`}
-    >
-      <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
-        <div className="flex items-center gap-2">
-          <span
-            className={`flex h-7 w-7 items-center justify-center rounded-lg ${
-              isAdmin
-                ? 'bg-blue-600 text-white'
-                : 'bg-zinc-100 text-zinc-600'
-            }`}
-          >
-            {isAdmin ? (
-              <ShieldCheck
-                size={14}
-              />
-            ) : (
-              <UserRound
-                size={14}
-              />
-            )}
-          </span>
-
-          <span className="font-black text-zinc-700">
-            {senderLabel(
-              message,
-            )}
-          </span>
-        </div>
-
-        <time className="text-zinc-400">
-          {formatDate(
-            message.createdAt,
-          )}
-        </time>
+        {title}
       </div>
 
-      <p className="mt-3 whitespace-pre-wrap text-sm leading-8 text-zinc-800">
-        {message.body}
-      </p>
-    </article>
+      <div className="mt-3 text-sm font-bold text-zinc-900">
+        {children}
+      </div>
+    </section>
   )
 }
 
-function InfoRow({
+function Row({
   label,
   value,
+  ltr = false,
 }: {
   label: string
+
   value: string
+
+  ltr?: boolean
 }) {
   return (
-    <div className="flex items-start justify-between gap-4 border-b border-zinc-100 pb-3 last:border-0 last:pb-0">
-      <dt className="shrink-0 text-zinc-500">
+    <div className="flex items-start justify-between gap-3 border-b border-zinc-100 pb-3 last:border-0">
+      <dt className="text-zinc-500">
         {label}
       </dt>
 
-      <dd className="text-left font-black text-zinc-800">
+      <dd
+        dir={
+          ltr
+            ? 'ltr'
+            : undefined
+        }
+        className="break-all text-left font-bold"
+      >
         {value}
       </dd>
     </div>

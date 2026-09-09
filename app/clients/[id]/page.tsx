@@ -12,9 +12,17 @@ import {
   ShieldAlert,
 } from 'lucide-react'
 
-import { useParams } from 'next/navigation'
+import {
+  useParams,
+} from 'next/navigation'
 
-import { AccountStatusBadge } from '@/components/common/AccountStatusBadge'
+import {
+  AccountStatusBadge,
+} from '@/components/common/AccountStatusBadge'
+
+import {
+  PasswordResetSection,
+} from '@/components/common/PasswordResetSection'
 
 import {
   ErrorState,
@@ -24,17 +32,46 @@ import {
 import {
   getClient,
   updateClientAccountStatus,
+  updateClientPassword,
 } from '@/services/client.service'
 
-import type { Client } from '@/types/client'
+import type {
+  Client,
+} from '@/types/client'
 
-import type { AccountStatus } from '@/types/common'
+import type {
+  AccountStatus,
+} from '@/types/common'
+
+function formatDate(
+  value: string,
+) {
+  if (!value) {
+    return '—'
+  }
+
+  const date =
+    new Date(value)
+
+  if (
+    Number.isNaN(
+      date.getTime(),
+    )
+  ) {
+    return '—'
+  }
+
+  return date.toLocaleDateString(
+    'fa-IR',
+  )
+}
 
 export default function ClientDetailsPage() {
-  const { id } =
-    useParams<{
-      id: string
-    }>()
+  const {
+    id,
+  } = useParams<{
+    id: string
+  }>()
 
   const [
     client,
@@ -75,18 +112,22 @@ export default function ClientDetailsPage() {
 
     getClient(id)
       .then((data) => {
-        if (active) {
-          setClient(data)
+        if (!active) {
+          return
         }
+
+        setClient(data)
       })
       .catch((err) => {
-        if (active) {
-          setError(
-            err instanceof Error
-              ? err.message
-              : 'خطا در دریافت موکل',
-          )
+        if (!active) {
+          return
         }
+
+        setError(
+          err instanceof Error
+            ? err.message
+            : 'خطا در دریافت موکل',
+        )
       })
       .finally(() => {
         if (active) {
@@ -114,7 +155,17 @@ export default function ClientDetailsPage() {
       status ===
         'SUSPENDED' &&
       !window.confirm(
-        'این کار login موکل را مسدود می‌کند. ادامه می‌دهید؟',
+        'این کار ورود موکل به حساب را مسدود می‌کند. ادامه می‌دهید؟',
+      )
+    ) {
+      return
+    }
+
+    if (
+      status ===
+        'ACTIVE' &&
+      !window.confirm(
+        'اکانت موکل دوباره فعال شود؟',
       )
     ) {
       return
@@ -122,6 +173,7 @@ export default function ClientDetailsPage() {
 
     try {
       setIsSaving(true)
+
       setError(null)
       setSuccess(null)
 
@@ -134,7 +186,8 @@ export default function ClientDetailsPage() {
       setClient(updated)
 
       setSuccess(
-        status === 'ACTIVE'
+        status ===
+          'ACTIVE'
           ? 'اکانت موکل فعال شد.'
           : 'اکانت موکل مسدود شد.',
       )
@@ -150,7 +203,9 @@ export default function ClientDetailsPage() {
   }
 
   if (isLoading) {
-    return <LoadingState />
+    return (
+      <LoadingState label="در حال دریافت اطلاعات موکل..." />
+    )
   }
 
   if (!client) {
@@ -183,15 +238,16 @@ export default function ClientDetailsPage() {
 
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-black">
+            <h1 className="text-2xl font-black text-zinc-950">
               {
                 client.fullName
               }
             </h1>
 
             <p className="mt-1 text-sm text-zinc-500">
-              جزئیات موکل و
-              مدیریت دسترسی اکانت
+              جزئیات موکل، مدیریت
+              دسترسی و تغییر رمز
+              عبور حساب
             </p>
           </div>
 
@@ -215,12 +271,17 @@ export default function ClientDetailsPage() {
         </div>
       )}
 
-      <section className="rounded-2xl border border-zinc-200 bg-white p-5">
-        <dl className="grid gap-4 sm:grid-cols-2">
+      <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+        <h2 className="font-black text-zinc-950">
+          اطلاعات موکل
+        </h2>
+
+        <dl className="mt-4 grid gap-4 sm:grid-cols-2">
           <Info
             label="شماره تماس"
             value={
-              client.phone
+              client.phone ||
+              '—'
             }
             ltr
           />
@@ -228,17 +289,16 @@ export default function ClientDetailsPage() {
           <Info
             label="ایمیل"
             value={
-              client.email
+              client.email ||
+              '—'
             }
             ltr
           />
 
           <Info
             label="تاریخ ثبت‌نام"
-            value={new Date(
+            value={formatDate(
               client.createdAt,
-            ).toLocaleDateString(
-              'fa-IR',
             )}
           />
 
@@ -254,57 +314,92 @@ export default function ClientDetailsPage() {
         </dl>
       </section>
 
-      <section className="rounded-2xl border border-red-100 bg-white p-5">
-        <div className="flex items-center gap-2">
-          <ShieldAlert
-            size={20}
-            className="text-red-600"
+      <section className="rounded-2xl border border-red-100 bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <ShieldAlert
+                size={20}
+                className="text-red-600"
+              />
+
+              <h2 className="font-black text-zinc-950">
+                کنترل دسترسی اکانت
+              </h2>
+            </div>
+
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-500">
+              مسدود کردن اکانت،
+              امکان ورود موکل به
+              حساب را قطع می‌کند.
+              اطلاعات حساب حذف
+              نمی‌شوند و مدیر
+              می‌تواند دوباره آن را
+              فعال کند.
+            </p>
+          </div>
+
+          <AccountStatusBadge
+            status={
+              client.accountStatus
+            }
           />
-
-          <h2 className="font-black">
-            کنترل دسترسی اکانت
-          </h2>
         </div>
-
-        <p className="mt-2 text-sm leading-6 text-zinc-500">
-          مسدود کردن اکانت،
-          دسترسی login این User
-          را قطع می‌کند.
-        </p>
 
         <div className="mt-5">
           {client.accountStatus ===
           'ACTIVE' ? (
             <button
+              type="button"
               disabled={
                 isSaving
               }
               onClick={() =>
-                changeStatus(
+                void changeStatus(
                   'SUSPENDED',
                 )
               }
-              className="rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50"
+              className="rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              مسدود کردن اکانت
+              {isSaving
+                ? 'در حال ذخیره...'
+                : 'مسدود کردن اکانت'}
             </button>
           ) : (
             <button
+              type="button"
               disabled={
                 isSaving
               }
               onClick={() =>
-                changeStatus(
+                void changeStatus(
                   'ACTIVE',
                 )
               }
-              className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+              className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              فعال کردن اکانت
+              {isSaving
+                ? 'در حال ذخیره...'
+                : 'فعال کردن اکانت'}
             </button>
           )}
         </div>
       </section>
+
+      <PasswordResetSection
+        title="تغییر رمز عبور موکل"
+        subjectName={
+          client.fullName
+        }
+        onReset={(
+          password,
+        ) =>
+          updateClientPassword(
+            client.id,
+            password,
+          )
+        }
+      />
     </div>
   )
 }
@@ -315,7 +410,9 @@ function Info({
   ltr = false,
 }: {
   label: string
+
   value: string
+
   ltr?: boolean
 }) {
   return (
@@ -330,7 +427,7 @@ function Info({
             ? 'ltr'
             : undefined
         }
-        className="mt-2 font-bold text-zinc-900"
+        className="mt-2 break-words font-bold text-zinc-900"
       >
         {value}
       </dd>

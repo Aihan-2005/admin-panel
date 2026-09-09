@@ -1,9 +1,5 @@
 export const API_ENDPOINTS = {
-
-  
-  
-
-  authLogin: '/auth/login',
+   authLogin: '/auth/login',
 
   authRefresh: '/auth/refresh',
 
@@ -11,11 +7,9 @@ export const API_ENDPOINTS = {
 
   authLogout: '/auth/logout',
 
-  
 
   dashboard: '/admin/dashboard',
 
-  
 
   lawyers: '/admin/lawyers',
 
@@ -31,7 +25,6 @@ export const API_ENDPOINTS = {
   lawyerPassword: (id: string) =>
     `/admin/lawyers/${id}/password`,
 
-  
 
   clients: '/admin/clients',
 
@@ -44,7 +37,6 @@ export const API_ENDPOINTS = {
   clientPassword: (id: string) =>
     `/admin/clients/${id}/password`,
 
-  
 
   tickets: '/admin/tickets',
 
@@ -62,4 +54,10 @@ export const API_ENDPOINTS = {
     messageId: string,
   ) =>
     `/admin/tickets/${ticketId}/messages/${messageId}/attachment`,
+
+
+    faq: '/faq',
+
+  faqItem: (id: string) =>
+    `/faq/${id}`,
 } as const

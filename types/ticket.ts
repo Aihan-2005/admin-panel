@@ -5,6 +5,11 @@ export type TicketStatus =
   | 'RESOLVED'
   | 'CLOSED'
 
+export type TicketType =
+  | 'BUG'
+  | 'SUGGESTION'
+  | 'OTHER'
+
 export interface TicketMessage {
   id: string
 
@@ -35,9 +40,7 @@ export interface Ticket {
   subject: string
 
   type?:
-    | 'BUG'
-    | 'SUGGESTION'
-    | 'OTHER'
+    | TicketType
     | null
 
   description?:
@@ -54,8 +57,17 @@ export interface Ticket {
     | string
     | null
 
-  requesterType:
-    | 'LAWYER'
+  requesterPhone?:
+    | string
+    | null
+
+  requesterEmail?:
+    | string
+    | null
+
+  requesterType: 'LAWYER'
+
+  messageCount?: number
 
   createdAt: string
 
@@ -70,8 +82,7 @@ export const TICKET_STATUS_LABELS: Record<
   TicketStatus,
   string
 > = {
-  OPEN:
-    'باز',
+  OPEN: 'باز',
 
   IN_PROGRESS:
     'در حال بررسی',
@@ -84,4 +95,15 @@ export const TICKET_STATUS_LABELS: Record<
 
   CLOSED:
     'بسته',
+}
+
+export const TICKET_TYPE_LABELS: Record<
+  TicketType,
+  string
+> = {
+  BUG: 'گزارش مشکل',
+
+  SUGGESTION: 'پیشنهاد',
+
+  OTHER: 'سایر',
 }

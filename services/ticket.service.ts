@@ -6,10 +6,20 @@ import {
   API_ENDPOINTS,
 } from '@/lib/api/endpoints'
 
+import {
+  getLawyer,
+  getLawyers,
+} from '@/services/lawyer.service'
+
+import type {
+  Lawyer,
+} from '@/types/lawyer'
+
 import type {
   Ticket,
   TicketMessage,
   TicketStatus,
+  TicketType,
 } from '@/types/ticket'
 
 interface BackendTicket {
@@ -21,12 +31,11 @@ interface BackendTicket {
 
   title: string
 
-  type?:
-    | 'BUG'
-    | 'SUGGESTION'
-    | 'OTHER'
+  type?: TicketType
 
   status: TicketStatus
+
+  messageCount?: number
 
   createdAt:
     | string
@@ -69,6 +78,24 @@ interface ApiListResponse<T> {
   data: T[]
 }
 
+interface AttachmentUrlResponse {
+  success: boolean
+
+  data: {
+    url: string
+  }
+}
+
+interface RequesterIdentity {
+  id: string
+
+  name: string
+
+  phone: string | null
+
+  email: string | null
+}
+
 function toId(
   value: unknown,
 ): string {
@@ -80,7 +107,8 @@ function toId(
   }
 
   if (
-    value == null
+    value === null ||
+    value === undefined
   ) {
     return ''
   }
@@ -107,8 +135,48 @@ function toDateString(
   return String(value)
 }
 
+function lawyerToIdentity(
+  lawyer: Lawyer,
+): RequesterIdentity {
+  return {
+    id: lawyer.id,
+
+    name:
+      lawyer.fullName ||
+      lawyer.phone ||
+      lawyer.email ||
+      'وکیل',
+
+    phone:
+      lawyer.phone ||
+      null,
+
+    email:
+      lawyer.email ||
+      null,
+  }
+}
+
+function fallbackIdentity(
+  lawyerId: string,
+): RequesterIdentity {
+  return {
+    id: lawyerId,
+
+    name:
+      lawyerId
+        ? `وکیل`
+        : 'نامشخص',
+
+    phone: null,
+
+    email: null,
+  }
+}
+
 function mapMessage(
   message: BackendTicketMessage,
+  requester?: RequesterIdentity,
 ): TicketMessage {
   return {
     id: toId(
@@ -131,7 +199,8 @@ function mapMessage(
       message.senderType ===
       'ADMIN'
         ? 'ادمین'
-        : 'وکیل',
+        : requester?.name ??
+          'وکیل',
 
     attachmentId:
       toId(
@@ -147,13 +216,9 @@ function mapMessage(
 
 function mapTicket(
   ticket: BackendTicket,
+  requester: RequesterIdentity,
   messages: TicketMessage[] = [],
 ): Ticket {
-  const lawyerId =
-    toId(
-      ticket.lawyerId,
-    )
-
   const firstLawyerMessage =
     messages.find(
       (message) =>
@@ -162,36 +227,46 @@ function mapTicket(
     )
 
   return {
-    id: toId(
-      ticket.id ??
-        ticket._id,
-    ),
+    id:
+      toId(
+        ticket.id ??
+          ticket._id,
+      ),
 
     subject:
       ticket.title,
 
     type:
-      ticket.type ?? null,
+      ticket.type ??
+      null,
 
     status:
       ticket.status,
 
     requesterId:
-      lawyerId || null,
+      requester.id ||
+      null,
 
-   
-      
     requesterName:
-      lawyerId
-        ? `وکیل ${lawyerId.slice(-6)}`
-        : 'وکیل',
+      requester.name,
+
+    requesterPhone:
+      requester.phone,
+
+    requesterEmail:
+      requester.email,
 
     requesterType:
       'LAWYER',
 
+    messageCount:
+      ticket.messageCount ??
+      messages.length,
+
     description:
       firstLawyerMessage
-        ?.body ?? null,
+        ?.body ??
+      null,
 
     createdAt:
       toDateString(
@@ -209,25 +284,74 @@ function mapTicket(
   }
 }
 
+function getLawyerId(
+  ticket: BackendTicket,
+) {
+  return toId(
+    ticket.lawyerId,
+  )
+}
+
 export async function getTickets(
   params: {
     search?: string
 
-    status?:
-      TicketStatus
+    status?: TicketStatus
   } = {},
 ): Promise<Ticket[]> {
-  const response =
-    await apiRequest<
+  const [
+    response,
+    lawyers,
+  ] = await Promise.all([
+    apiRequest<
       ApiListResponse<BackendTicket>
     >(
       API_ENDPOINTS.tickets,
-    )
+    ),
+
+    getLawyers().catch(
+      () => [] as Lawyer[],
+    ),
+  ])
+
+  const lawyerMap =
+    new Map<
+      string,
+      RequesterIdentity
+    >()
+
+  lawyers.forEach(
+    (lawyer) => {
+      lawyerMap.set(
+        lawyer.id,
+        lawyerToIdentity(
+          lawyer,
+        ),
+      )
+    },
+  )
 
   let tickets =
     response.data.map(
-      (ticket) =>
-        mapTicket(ticket),
+      (ticket) => {
+        const lawyerId =
+          getLawyerId(
+            ticket,
+          )
+
+        const requester =
+          lawyerMap.get(
+            lawyerId,
+          ) ??
+          fallbackIdentity(
+            lawyerId,
+          )
+
+        return mapTicket(
+          ticket,
+          requester,
+        )
+      },
     )
 
   if (params.status) {
@@ -239,7 +363,9 @@ export async function getTickets(
       )
   }
 
-  if (params.search) {
+  if (
+    params.search?.trim()
+  ) {
     const query =
       params.search
         .trim()
@@ -252,10 +378,10 @@ export async function getTickets(
         (ticket) =>
           [
             ticket.id,
-
             ticket.subject,
-
-            ticket.requesterId,
+            ticket.requesterName,
+            ticket.requesterPhone,
+            ticket.requesterEmail,
           ].some(
             (value) =>
               value
@@ -296,33 +422,103 @@ export async function getTicket(
     ),
   ])
 
+  const lawyerId =
+    getLawyerId(
+      ticketResponse.data,
+    )
+
+  let requester =
+    fallbackIdentity(
+      lawyerId,
+    )
+
+  if (lawyerId) {
+    try {
+      const lawyer =
+        await getLawyer(
+          lawyerId,
+        )
+
+      requester =
+        lawyerToIdentity(
+          lawyer,
+        )
+    } catch {
+      // اطلاعات تیکت حتی اگر
+      // دریافت پروفایل وکیل
+      // شکست خورد نمایش داده شود.
+    }
+  }
+
   const messages =
     messagesResponse.data.map(
-      mapMessage,
+      (message) =>
+        mapMessage(
+          message,
+          requester,
+        ),
     )
 
   return mapTicket(
     ticketResponse.data,
+    requester,
     messages,
   )
 }
 
 export async function replyToTicket(
   id: string,
-  body: string,
+  message: string,
+  attachment?: File | null,
 ): Promise<Ticket> {
-  await apiRequest(
-    API_ENDPOINTS.ticketMessages(
-      id,
-    ),
-    {
-      method: 'POST',
+  const trimmedMessage =
+    message.trim()
 
-      body: JSON.stringify({
-        message: body,
-      }),
-    },
-  )
+  if (!trimmedMessage) {
+    throw new Error(
+      'متن پاسخ نمی‌تواند خالی باشد.',
+    )
+  }
+
+  if (attachment) {
+    const formData =
+      new FormData()
+
+    formData.append(
+      'message',
+      trimmedMessage,
+    )
+
+    formData.append(
+      'attachment',
+      attachment,
+    )
+
+    await apiRequest(
+      API_ENDPOINTS.ticketMessages(
+        id,
+      ),
+      {
+        method: 'POST',
+
+        body: formData,
+      },
+    )
+  } else {
+    await apiRequest(
+      API_ENDPOINTS.ticketMessages(
+        id,
+      ),
+      {
+        method: 'POST',
+
+        body: JSON.stringify({
+          message:
+            trimmedMessage,
+        }),
+      },
+    )
+  }
 
   return getTicket(id)
 }
@@ -345,4 +541,29 @@ export async function updateTicketStatus(
   )
 
   return getTicket(id)
+}
+
+export async function getTicketAttachmentUrl(
+  ticketId: string,
+  messageId: string,
+): Promise<string> {
+  const response =
+    await apiRequest<
+      AttachmentUrlResponse
+    >(
+      API_ENDPOINTS.ticketMessageAttachment(
+        ticketId,
+        messageId,
+      ),
+    )
+
+  if (
+    !response.data?.url
+  ) {
+    throw new Error(
+      'لینک فایل از سرور دریافت نشد.',
+    )
+  }
+
+  return response.data.url
 }

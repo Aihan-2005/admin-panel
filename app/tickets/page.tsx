@@ -9,10 +9,10 @@ import {
 import Link from 'next/link'
 
 import {
-  ChevronLeft,
-  ChevronRight,
   Clock3,
+  Mail,
   MessageSquareText,
+  Phone,
   Search,
   UserRound,
 } from 'lucide-react'
@@ -23,7 +23,9 @@ import {
   LoadingState,
 } from '@/components/common/PageState'
 
-import { getTickets } from '@/services/ticket.service'
+import {
+  getTickets,
+} from '@/services/ticket.service'
 
 import {
   TICKET_STATUS_LABELS,
@@ -35,8 +37,6 @@ const TICKET_STATUSES =
   Object.keys(
     TICKET_STATUS_LABELS,
   ) as TicketStatus[]
-
-const PAGE_SIZE = 10
 
 const STATUS_STYLES: Record<
   TicketStatus,
@@ -80,6 +80,7 @@ function formatDate(
     'fa-IR',
     {
       dateStyle: 'medium',
+
       timeStyle: 'short',
     },
   )
@@ -89,10 +90,9 @@ export default function TicketsPage() {
   const [
     tickets,
     setTickets,
-  ] =
-    useState<Ticket[]>(
-      [],
-    )
+  ] = useState<
+    Ticket[]
+  >([])
 
   const [
     search,
@@ -107,22 +107,8 @@ export default function TicketsPage() {
   >('ALL')
 
   const [
-    requesterType,
-    setRequesterType,
-  ] = useState<
-    | 'ALL'
-    | 'LAWYER'
-    | 'CLIENT'
-  >('ALL')
-
-  const [
-    page,
-    setPage,
-  ] = useState(1)
-
-  const [
-    isLoading,
-    setIsLoading,
+    loading,
+    setLoading,
   ] = useState(true)
 
   const [
@@ -139,7 +125,9 @@ export default function TicketsPage() {
     getTickets()
       .then((data) => {
         if (active) {
-          setTickets(data)
+          setTickets(
+            data,
+          )
         }
       })
       .catch((err) => {
@@ -153,7 +141,7 @@ export default function TicketsPage() {
       })
       .finally(() => {
         if (active) {
-          setIsLoading(false)
+          setLoading(false)
         }
       })
 
@@ -162,42 +150,7 @@ export default function TicketsPage() {
     }
   }, [])
 
-  const stats =
-    useMemo(() => {
-      return TICKET_STATUSES.reduce<
-        Record<
-          TicketStatus,
-          number
-        >
-      >(
-        (
-          result,
-          item,
-        ) => {
-          result[item] =
-            tickets.filter(
-              (ticket) =>
-                ticket.status ===
-                item,
-            ).length
-
-          return result
-        },
-       {
-  OPEN: 0,
-
-  IN_PROGRESS: 0,
-
-  WAITING_FOR_LAWYER: 0,
-
-  RESOLVED: 0,
-
-  CLOSED: 0,
-},
-      )
-    }, [tickets])
-
-  const filteredTickets =
+  const filtered =
     useMemo(() => {
       const query =
         search
@@ -206,42 +159,37 @@ export default function TicketsPage() {
             'fa-IR',
           )
 
-      return [...tickets]
+      return tickets
         .filter(
           (ticket) => {
-            const matchesSearch =
-              !query ||
-              [
-                ticket.id,
-                ticket.subject,
-                ticket.requesterName,
-                ticket.description,
-              ].some((value) =>
-                value
-                  ?.toLocaleLowerCase(
-                    'fa-IR',
-                  )
-                  .includes(
-                    query,
-                  ),
-              )
-
             const matchesStatus =
               status ===
                 'ALL' ||
               ticket.status ===
                 status
 
-            const matchesRequester =
-              requesterType ===
-                'ALL' ||
-              ticket.requesterType ===
-                requesterType
+            const matchesSearch =
+              !query ||
+              [
+                ticket.id,
+                ticket.subject,
+                ticket.requesterName,
+                ticket.requesterPhone,
+                ticket.requesterEmail,
+              ].some(
+                (value) =>
+                  value
+                    ?.toLocaleLowerCase(
+                      'fa-IR',
+                    )
+                    .includes(
+                      query,
+                    ),
+              )
 
-            return Boolean(
-              matchesSearch &&
-                matchesStatus &&
-                matchesRequester,
+            return (
+              matchesStatus &&
+              matchesSearch
             )
           },
         )
@@ -257,43 +205,44 @@ export default function TicketsPage() {
             ).getTime(),
         )
     }, [
-      requesterType,
       search,
       status,
       tickets,
     ])
 
-  const totalPages =
-    Math.max(
-      1,
-      Math.ceil(
-        filteredTickets.length /
-          PAGE_SIZE,
-      ),
-    )
+  const stats =
+    useMemo(() => {
+      return TICKET_STATUSES.reduce(
+        (
+          result,
+          item,
+        ) => {
+          result[item] =
+            tickets.filter(
+              (ticket) =>
+                ticket.status ===
+                item,
+            ).length
 
-  const currentPage =
-    Math.min(
-      page,
-      totalPages,
-    )
+          return result
+        },
+        {
+          OPEN: 0,
 
-  const paginatedTickets =
-    filteredTickets.slice(
-      (currentPage - 1) *
-        PAGE_SIZE,
+          IN_PROGRESS: 0,
 
-      currentPage *
-        PAGE_SIZE,
-    )
+          WAITING_FOR_LAWYER:
+            0,
 
-  useEffect(() => {
-    setPage(1)
-  }, [
-    search,
-    status,
-    requesterType,
-  ])
+          RESOLVED: 0,
+
+          CLOSED: 0,
+        } as Record<
+          TicketStatus,
+          number
+        >,
+      )
+    }, [tickets])
 
   return (
     <div
@@ -306,75 +255,69 @@ export default function TicketsPage() {
         </h1>
 
         <p className="mt-1 text-sm text-zinc-500">
-          مشاهده، فیلتر،
-          پاسخ‌گویی و تغییر وضعیت
-          تیکت‌های پشتیبانی
+          مدیریت درخواست‌های
+          پشتیبانی، فایل‌ها و
+          پاسخ‌گویی به وکلا
         </p>
       </div>
 
       {error && (
         <ErrorState
-          message={error}
+          message={
+            error
+          }
         />
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         {TICKET_STATUSES.map(
           (item) => (
             <button
               key={item}
               type="button"
               onClick={() =>
-                setStatus(item)
+                setStatus(
+                  status ===
+                    item
+                    ? 'ALL'
+                    : item,
+                )
               }
-              className={`rounded-2xl border bg-white p-4 text-right shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
-                status === item
-                  ? 'border-blue-300 ring-2 ring-blue-100'
+              className={`rounded-2xl border bg-white p-4 text-right shadow-sm transition ${
+                status ===
+                item
+                  ? 'border-blue-400 ring-2 ring-blue-100'
                   : 'border-zinc-200'
               }`}
             >
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-bold text-zinc-500">
-                    {
-                      TICKET_STATUS_LABELS[
-                        item
-                      ]
-                    }
-                  </p>
+              <div className="text-xs font-bold text-zinc-500">
+                {
+                  TICKET_STATUS_LABELS[
+                    item
+                  ]
+                }
+              </div>
 
-                  <p className="mt-2 text-2xl font-black text-zinc-950">
-                    {new Intl.NumberFormat(
-                      'fa-IR',
-                    ).format(
-                      stats[
-                        item
-                      ],
-                    )}
-                  </p>
-                </div>
-
-                <span
-                  className={`rounded-full border px-2.5 py-1 text-xs font-black ${STATUS_STYLES[item]}`}
-                >
-                  {
-                    TICKET_STATUS_LABELS[
-                      item
-                    ]
-                  }
-                </span>
+              <div className="mt-2 text-2xl font-black text-zinc-950">
+                {new Intl.NumberFormat(
+                  'fa-IR',
+                ).format(
+                  stats[
+                    item
+                  ],
+                )}
               </div>
             </button>
           ),
         )}
       </div>
 
-      <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm shadow-zinc-100">
-        <div className="grid gap-3 lg:grid-cols-[minmax(300px,1fr)_220px_220px]">
+      <section className="rounded-2xl border border-zinc-200 bg-white p-4">
+        <div className="grid gap-3 md:grid-cols-[1fr_240px]">
           <div className="relative">
             <Search
               size={18}
-              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400"
             />
 
             <input
@@ -387,8 +330,8 @@ export default function TicketsPage() {
                     .value,
                 )
               }
-              placeholder="جستجو در عنوان، نام درخواست‌دهنده، توضیحات یا شناسه..."
-              className="h-11 w-full rounded-xl border border-zinc-300 bg-white pr-10 pl-4 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              placeholder="نام وکیل، شماره، ایمیل، عنوان یا شناسه تیکت..."
+              className="h-11 w-full rounded-xl border border-zinc-300 pr-10 pl-4 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
             />
           </div>
 
@@ -404,7 +347,7 @@ export default function TicketsPage() {
                   | 'ALL',
               )
             }
-            className="h-11 rounded-xl border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            className="h-11 rounded-xl border border-zinc-300 bg-white px-3 text-sm outline-none"
           >
             <option value="ALL">
               همه وضعیت‌ها
@@ -413,12 +356,8 @@ export default function TicketsPage() {
             {TICKET_STATUSES.map(
               (item) => (
                 <option
-                  key={
-                    item
-                  }
-                  value={
-                    item
-                  }
+                  key={item}
+                  value={item}
                 >
                   {
                     TICKET_STATUS_LABELS[
@@ -429,260 +368,205 @@ export default function TicketsPage() {
               ),
             )}
           </select>
-
-          <select
-            value={
-              requesterType
-            }
-            onChange={(
-              event,
-            ) =>
-              setRequesterType(
-                event.target
-                  .value as
-                  | 'ALL'
-                  | 'LAWYER'
-                  | 'CLIENT',
-              )
-            }
-            className="h-11 rounded-xl border border-zinc-300 bg-white px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-          >
-            <option value="ALL">
-              همه کاربران
-            </option>
-
-            <option value="LAWYER">
-              وکلا
-            </option>
-
-            <option value="CLIENT">
-              موکلین
-            </option>
-          </select>
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm shadow-zinc-100">
-        {isLoading ? (
+      <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white">
+        {loading ? (
           <LoadingState label="در حال دریافت تیکت‌ها..." />
-        ) : paginatedTickets.length ===
+        ) : filtered.length ===
           0 ? (
-          <EmptyState message="تیکتی با این شرایط پیدا نشد." />
+          <EmptyState message="تیکتی پیدا نشد." />
         ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[920px] text-right text-sm">
-                <thead className="border-b border-zinc-200 bg-zinc-50/80">
-                  <tr>
-                    <th className="px-4 py-3 font-black text-zinc-600">
-                      تیکت
-                    </th>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1050px] text-right text-sm">
+              <thead className="border-b border-zinc-200 bg-zinc-50">
+                <tr>
+                  <th className="px-4 py-3">
+                    تیکت
+                  </th>
 
-                    <th className="px-4 py-3 font-black text-zinc-600">
-                      درخواست‌دهنده
-                    </th>
+                  <th className="px-4 py-3">
+                    درخواست‌دهنده
+                  </th>
 
-                    <th className="px-4 py-3 font-black text-zinc-600">
-                      وضعیت
-                    </th>
+                  <th className="px-4 py-3">
+                    تماس
+                  </th>
 
-                    <th className="px-4 py-3 font-black text-zinc-600">
-                      پیام‌ها
-                    </th>
+                  <th className="px-4 py-3">
+                    وضعیت
+                  </th>
 
-                    <th className="px-4 py-3 font-black text-zinc-600">
-                      آخرین تغییر
-                    </th>
+                  <th className="px-4 py-3">
+                    پیام
+                  </th>
 
-                    <th className="px-4 py-3" />
-                  </tr>
-                </thead>
+                  <th className="px-4 py-3">
+                    بروزرسانی
+                  </th>
 
-                <tbody className="divide-y divide-zinc-100">
-                  {paginatedTickets.map(
-                    (ticket) => (
-                      <tr
-                        key={
-                          ticket.id
-                        }
-                        className="transition hover:bg-blue-50/30"
-                      >
-                        <td className="px-4 py-3.5">
-                          <div className="max-w-[320px] truncate font-black text-zinc-900">
-                            {
-                              ticket.subject
+                  <th />
+                </tr>
+              </thead>
+
+              <tbody className="divide-y divide-zinc-100">
+                {filtered.map(
+                  (ticket) => (
+                    <tr
+                      key={
+                        ticket.id
+                      }
+                      className="hover:bg-zinc-50"
+                    >
+                      <td className="px-4 py-4">
+                        <div className="max-w-[260px] truncate font-black">
+                          {
+                            ticket.subject
+                          }
+                        </div>
+
+                        <div
+                          dir="ltr"
+                          className="mt-1 w-fit text-xs text-zinc-400"
+                        >
+                          {
+                            ticket.id
+                          }
+                        </div>
+                      </td>
+
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-2">
+                          <UserRound
+                            size={
+                              17
                             }
-                          </div>
+                            className="text-zinc-400"
+                          />
 
-                          <div
-                            dir="ltr"
-                            className="mt-1 w-fit text-xs text-zinc-400"
-                          >
-                            {
-                              ticket.id
-                            }
-                          </div>
-                        </td>
+                          <div>
+                            <div className="font-bold">
+                              {ticket.requesterName ||
+                                'وکیل'}
+                            </div>
 
-                        <td className="px-4 py-3.5">
-                          <div className="flex items-center gap-2">
-                            <UserRound
-                              size={
-                                16
-                              }
-                              className="text-zinc-400"
-                            />
-
-                            <div>
-                              <div className="font-bold text-zinc-800">
-                                {ticket.requesterName ||
-                                  'نامشخص'}
-                              </div>
-
-                              <div className="mt-0.5 text-xs text-zinc-400">
-                                {ticket.requesterType ===
-                                'LAWYER'
-                                  ? 'وکیل'
-                                  : ticket.requesterType ===
-                                      'CLIENT'
-                                    ? 'موکل'
-                                    : ticket.requesterType ||
-                                      'نامشخص'}
-                              </div>
+                            <div className="mt-1 text-xs text-zinc-400">
+                              وکیل
                             </div>
                           </div>
-                        </td>
+                        </div>
+                      </td>
 
-                        <td className="px-4 py-3.5">
-                          <span
-                            className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${STATUS_STYLES[ticket.status]}`}
-                          >
-                            {
-                              TICKET_STATUS_LABELS[
-                                ticket
-                                  .status
-                              ]
-                            }
-                          </span>
-                        </td>
+                      <td className="px-4 py-4">
+                        <div className="space-y-1 text-xs">
+                          {ticket.requesterPhone && (
+                            <div
+                              dir="ltr"
+                              className="flex w-fit items-center gap-1"
+                            >
+                              <Phone
+                                size={
+                                  13
+                                }
+                              />
 
-                        <td className="px-4 py-3.5">
-                          <div className="inline-flex items-center gap-1.5 text-zinc-600">
-                            <MessageSquareText
-                              size={
-                                16
+                              {
+                                ticket.requesterPhone
                               }
-                            />
+                            </div>
+                          )}
 
-                            {new Intl.NumberFormat(
-                              'fa-IR',
-                            ).format(
+                          {ticket.requesterEmail && (
+                            <div
+                              dir="ltr"
+                              className="flex w-fit items-center gap-1"
+                            >
+                              <Mail
+                                size={
+                                  13
+                                }
+                              />
+
+                              {
+                                ticket.requesterEmail
+                              }
+                            </div>
+                          )}
+
+                          {!ticket.requesterPhone &&
+                            !ticket.requesterEmail && (
+                              <span className="text-zinc-400">
+                                —
+                              </span>
+                            )}
+                        </div>
+                      </td>
+
+                      <td className="px-4 py-4">
+                        <span
+                          className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${
+                            STATUS_STYLES[
                               ticket
-                                .messages
-                                ?.length ??
-                                0,
-                            )}
-                          </div>
-                        </td>
+                                .status
+                            ]
+                          }`}
+                        >
+                          {
+                            TICKET_STATUS_LABELS[
+                              ticket
+                                .status
+                            ]
+                          }
+                        </span>
+                      </td>
 
-                        <td className="px-4 py-3.5 text-zinc-500">
-                          <div className="flex items-center gap-1.5">
-                            <Clock3
-                              size={
-                                15
-                              }
-                            />
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-1.5">
+                          <MessageSquareText
+                            size={
+                              16
+                            }
+                          />
 
-                            {formatDate(
-                              ticket.updatedAt ??
-                                ticket.createdAt,
-                            )}
-                          </div>
-                        </td>
+                          {new Intl.NumberFormat(
+                            'fa-IR',
+                          ).format(
+                            ticket.messageCount ??
+                              0,
+                          )}
+                        </div>
+                      </td>
 
-                        <td className="px-4 py-3.5">
-                          <Link
-                            href={`/tickets/${ticket.id}`}
-                            className="rounded-lg px-2.5 py-2 text-xs font-black text-blue-700 transition hover:bg-blue-50"
-                          >
-                            باز کردن
-                          </Link>
-                        </td>
-                      </tr>
-                    ),
-                  )}
-                </tbody>
-              </table>
-            </div>
+                      <td className="px-4 py-4 text-zinc-500">
+                        <div className="flex items-center gap-1.5">
+                          <Clock3
+                            size={
+                              15
+                            }
+                          />
 
-            {totalPages >
-              1 && (
-              <div className="flex items-center justify-between border-t border-zinc-200 px-4 py-3">
-                <span className="text-xs font-bold text-zinc-500">
-                  صفحه{' '}
-                  {new Intl.NumberFormat(
-                    'fa-IR',
-                  ).format(
-                    currentPage,
-                  )}{' '}
-                  از{' '}
-                  {new Intl.NumberFormat(
-                    'fa-IR',
-                  ).format(
-                    totalPages,
-                  )}
-                </span>
+                          {formatDate(
+                            ticket.updatedAt ??
+                              ticket.createdAt,
+                          )}
+                        </div>
+                      </td>
 
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    disabled={
-                      currentPage <=
-                      1
-                    }
-                    onClick={() =>
-                      setPage(
-                        (
-                          current,
-                        ) =>
-                          current -
-                          1,
-                      )
-                    }
-                    className="rounded-lg border border-zinc-200 p-2 text-zinc-600 disabled:opacity-40"
-                    aria-label="صفحه قبلی"
-                  >
-                    <ChevronRight
-                      size={17}
-                    />
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={
-                      currentPage >=
-                      totalPages
-                    }
-                    onClick={() =>
-                      setPage(
-                        (
-                          current,
-                        ) =>
-                          current +
-                          1,
-                      )
-                    }
-                    className="rounded-lg border border-zinc-200 p-2 text-zinc-600 disabled:opacity-40"
-                    aria-label="صفحه بعدی"
-                  >
-                    <ChevronLeft
-                      size={17}
-                    />
-                  </button>
-                </div>
-              </div>
-            )}
-          </>
+                      <td className="px-4 py-4">
+                        <Link
+                          href={`/tickets/${ticket.id}`}
+                          className="rounded-xl bg-blue-50 px-3 py-2 text-xs font-black text-blue-700 hover:bg-blue-100"
+                        >
+                          مشاهده
+                        </Link>
+                      </td>
+                    </tr>
+                  ),
+                )}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
     </div>

@@ -13,24 +13,37 @@ import {
   ShieldAlert,
 } from 'lucide-react'
 
-import { useParams } from 'next/navigation'
+import {
+  useParams,
+} from 'next/navigation'
 
-import { AccountStatusBadge } from '@/components/common/AccountStatusBadge'
+import {
+  AccountStatusBadge,
+} from '@/components/common/AccountStatusBadge'
+
+import {
+  PasswordResetSection,
+} from '@/components/common/PasswordResetSection'
 
 import {
   ErrorState,
   LoadingState,
 } from '@/components/common/PageState'
 
-import { LawyerStatusBadge } from '@/components/lawyers/LawyerStatusBadge'
+import {
+  LawyerStatusBadge,
+} from '@/components/lawyers/LawyerStatusBadge'
 
 import {
   getLawyer,
   updateLawyerAccountStatus,
+  updateLawyerPassword,
   updateLawyerState,
 } from '@/services/lawyer.service'
 
-import type { AccountStatus } from '@/types/common'
+import type {
+  AccountStatus,
+} from '@/types/common'
 
 import {
   LAWYER_STATE_LABELS,
@@ -43,13 +56,35 @@ const LAWYER_STATES =
     LAWYER_STATE_LABELS,
   ) as LawyerState[]
 
-export default function LawyerDetailsPage() {
-  const params =
-    useParams<{
-      id: string
-    }>()
+function formatDate(
+  value: string,
+) {
+  if (!value) {
+    return '—'
+  }
 
-  const lawyerId = params.id
+  const date =
+    new Date(value)
+
+  if (
+    Number.isNaN(
+      date.getTime(),
+    )
+  ) {
+    return '—'
+  }
+
+  return date.toLocaleDateString(
+    'fa-IR',
+  )
+}
+
+export default function LawyerDetailsPage() {
+  const {
+    id: lawyerId,
+  } = useParams<{
+    id: string
+  }>()
 
   const [
     lawyer,
@@ -101,7 +136,9 @@ export default function LawyerDetailsPage() {
   useEffect(() => {
     let active = true
 
-    getLawyer(lawyerId)
+    getLawyer(
+      lawyerId,
+    )
       .then((data) => {
         if (!active) {
           return
@@ -114,13 +151,15 @@ export default function LawyerDetailsPage() {
         )
       })
       .catch((err) => {
-        if (active) {
-          setError(
-            err instanceof Error
-              ? err.message
-              : 'خطا در دریافت وکیل',
-          )
+        if (!active) {
+          return
         }
+
+        setError(
+          err instanceof Error
+            ? err.message
+            : 'خطا در دریافت وکیل',
+        )
       })
       .finally(() => {
         if (active) {
@@ -143,7 +182,10 @@ export default function LawyerDetailsPage() {
     }
 
     try {
-      setIsSavingState(true)
+      setIsSavingState(
+        true,
+      )
+
       setError(null)
       setSuccess(null)
 
@@ -169,7 +211,9 @@ export default function LawyerDetailsPage() {
           : 'تغییر وضعیت وکیل ناموفق بود.',
       )
     } finally {
-      setIsSavingState(false)
+      setIsSavingState(
+        false,
+      )
     }
   }
 
@@ -187,11 +231,13 @@ export default function LawyerDetailsPage() {
     const message =
       accountStatus ===
       'SUSPENDED'
-        ? 'با مسدود کردن اکانت، کاربر دیگر نمی‌تواند وارد حساب شود. ادامه می‌دهید؟'
-        : 'اکانت دوباره فعال شود؟'
+        ? 'با مسدود کردن اکانت، وکیل دیگر نمی‌تواند وارد حساب شود. ادامه می‌دهید؟'
+        : 'اکانت وکیل دوباره فعال شود؟'
 
     if (
-      !window.confirm(message)
+      !window.confirm(
+        message,
+      )
     ) {
       return
     }
@@ -232,7 +278,9 @@ export default function LawyerDetailsPage() {
   }
 
   if (isLoading) {
-    return <LoadingState />
+    return (
+      <LoadingState label="در حال دریافت اطلاعات وکیل..." />
+    )
   }
 
   if (!lawyer) {
@@ -271,13 +319,16 @@ export default function LawyerDetailsPage() {
           </h1>
 
           <p className="mt-1 text-sm text-zinc-500">
-            مدیریت اطلاعات و
-            وضعیت‌های مستقل وکیل
+            مدیریت اطلاعات،
+            وضعیت حرفه‌ای، دسترسی
+            اکانت و رمز عبور وکیل
           </p>
         </div>
 
         <LawyerStatusBadge
-          state={lawyer.state}
+          state={
+            lawyer.state
+          }
         />
       </div>
 
@@ -294,7 +345,7 @@ export default function LawyerDetailsPage() {
       )}
 
       <div className="grid gap-4 md:grid-cols-2">
-        <section className="rounded-2xl border border-zinc-200 bg-white p-5">
+        <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
           <h2 className="font-black text-zinc-900">
             اطلاعات وکیل
           </h2>
@@ -303,7 +354,8 @@ export default function LawyerDetailsPage() {
             <InfoRow
               label="شماره تماس"
               value={
-                lawyer.phone
+                lawyer.phone ||
+                '—'
               }
               ltr
             />
@@ -311,7 +363,8 @@ export default function LawyerDetailsPage() {
             <InfoRow
               label="ایمیل"
               value={
-                lawyer.email
+                lawyer.email ||
+                '—'
               }
               ltr
             />
@@ -334,26 +387,23 @@ export default function LawyerDetailsPage() {
 
             <InfoRow
               label="تاریخ ثبت‌نام"
-              value={new Date(
+              value={formatDate(
                 lawyer.createdAt,
-              ).toLocaleDateString(
-                'fa-IR',
               )}
             />
           </dl>
         </section>
 
-        <section className="rounded-2xl border border-zinc-200 bg-white p-5">
+        <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
           <h2 className="font-black text-zinc-900">
             وضعیت حرفه‌ای وکیل
           </h2>
 
           <p className="mt-2 text-sm leading-6 text-zinc-500">
-            این وضعیت فقط مجوز
-            فعالیت وکیل در سامانه
-            را کنترل می‌کند و به
-            ورود به اکانت ارتباطی
-            ندارد.
+            این وضعیت مجوز فعالیت
+            وکیل در سامانه را کنترل
+            می‌کند و مستقل از وضعیت
+            ورود به اکانت است.
           </p>
 
           <div className="mt-5 flex flex-col gap-3 sm:flex-row">
@@ -361,9 +411,11 @@ export default function LawyerDetailsPage() {
               value={
                 selectedState
               }
-              onChange={(e) =>
+              onChange={(
+                event,
+              ) =>
                 setSelectedState(
-                  e.target
+                  event.target
                     .value as LawyerState,
                 )
               }
@@ -396,8 +448,8 @@ export default function LawyerDetailsPage() {
                 selectedState ===
                   lawyer.state
               }
-              onClick={
-                handleStateUpdate
+              onClick={() =>
+                void handleStateUpdate()
               }
               className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
@@ -405,13 +457,15 @@ export default function LawyerDetailsPage() {
                 size={16}
               />
 
-              ذخیره
+              {isSavingState
+                ? 'در حال ذخیره...'
+                : 'ذخیره'}
             </button>
           </div>
         </section>
       </div>
 
-      <section className="rounded-2xl border border-zinc-200 bg-white p-5">
+      <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="flex items-center gap-2">
@@ -428,11 +482,10 @@ export default function LawyerDetailsPage() {
 
             <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-500">
               این وضعیت مستقل از
-              وضعیت وکیل است.
-              SUSPENDED یعنی کاربر
-              حتی اجازه login ندارد؛
-              مناسب شرایط امنیتی مثل
-              احتمال هک شدن اکانت.
+              وضعیت حرفه‌ای وکیل
+              است. در حالت مسدود،
+              کاربر اجازه ورود به
+              حساب را ندارد.
             </p>
           </div>
 
@@ -452,13 +505,15 @@ export default function LawyerDetailsPage() {
                 isSavingAccount
               }
               onClick={() =>
-                handleAccountStatusUpdate(
+                void handleAccountStatusUpdate(
                   'SUSPENDED',
                 )
               }
-              className="rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50"
+              className="rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              مسدود کردن اکانت
+              {isSavingAccount
+                ? 'در حال ذخیره...'
+                : 'مسدود کردن اکانت'}
             </button>
           ) : (
             <button
@@ -467,17 +522,36 @@ export default function LawyerDetailsPage() {
                 isSavingAccount
               }
               onClick={() =>
-                handleAccountStatusUpdate(
+                void handleAccountStatusUpdate(
                   'ACTIVE',
                 )
               }
-              className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+              className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              فعال کردن اکانت
+              {isSavingAccount
+                ? 'در حال ذخیره...'
+                : 'فعال کردن اکانت'}
             </button>
           )}
         </div>
       </section>
+
+      <PasswordResetSection
+        title="تغییر رمز عبور وکیل"
+        subjectName={
+          lawyer.fullName
+        }
+        onReset={(
+          password,
+        ) =>
+          updateLawyerPassword(
+            lawyer.id,
+            {
+              password,
+            },
+          )
+        }
+      />
     </div>
   )
 }
@@ -488,7 +562,9 @@ function InfoRow({
   ltr = false,
 }: {
   label: string
+
   value: string
+
   ltr?: boolean
 }) {
   return (
@@ -503,7 +579,7 @@ function InfoRow({
             ? 'ltr'
             : undefined
         }
-        className="font-bold text-zinc-800"
+        className="break-words font-bold text-zinc-800"
       >
         {value}
       </dd>
