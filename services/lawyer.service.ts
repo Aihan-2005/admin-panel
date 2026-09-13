@@ -3,7 +3,9 @@ import {
   buildQuery,
 } from '@/lib/api/client'
 
-import { API_ENDPOINTS } from '@/lib/api/endpoints'
+import {
+  API_ENDPOINTS,
+} from '@/lib/api/endpoints'
 
 import type {
   AccountStatus,
@@ -28,6 +30,22 @@ export interface LawyerListParams {
   sortOrder?: SortDirection
 }
 
+export interface CreateLawyerPayload {
+  firstName: string
+
+  lastName: string
+
+  phone?: string
+
+  email?: string
+
+  password: string
+
+  specialization?: string
+
+  licenseNumber?: string
+}
+
 export interface UpdateLawyerPasswordPayload {
   password: string
 }
@@ -36,9 +54,11 @@ interface BackendLawyerListItem {
   id: string
 
   firstName: string
+
   lastName: string
 
   email: string | null
+
   phone: string | null
 
   licenseNumber: string
@@ -60,6 +80,7 @@ interface BackendLawyerDetail {
   id: string
 
   firstName: string
+
   lastName: string
 
   email: string | null
@@ -99,7 +120,8 @@ interface LawyerListResponse {
   data:
     BackendLawyerListItem[]
 
-  pagination: Pagination
+  pagination:
+    Pagination
 }
 
 interface LawyerResponse {
@@ -113,21 +135,25 @@ function mapListLawyer(
   item: BackendLawyerListItem,
 ): Lawyer {
   return {
-    id: item.id,
+    id:
+      item.id,
 
-    fullName: [
-      item.firstName,
-      item.lastName,
-    ]
-      .filter(Boolean)
-      .join(' ')
-      .trim(),
+    fullName:
+      [
+        item.firstName,
+        item.lastName,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .trim(),
 
     phone:
-      item.phone ?? '',
+      item.phone ??
+      '',
 
     email:
-      item.email ?? '',
+      item.email ??
+      '',
 
     specialization:
       item.specialization,
@@ -142,7 +168,8 @@ function mapListLawyer(
       item.accountStatus,
 
     createdAt:
-      item.createdAt ?? '',
+      item.createdAt ??
+      '',
   }
 }
 
@@ -150,22 +177,26 @@ function mapDetailLawyer(
   item: BackendLawyerDetail,
 ): Lawyer {
   return {
-    id: item.id,
+    id:
+      item.id,
 
-    fullName: [
-      item.firstName,
-      item.lastName,
-    ]
-      .filter(Boolean)
-      .join(' ')
-      .trim(),
+    fullName:
+      [
+        item.firstName,
+        item.lastName,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .trim(),
 
     phone:
       item.profile
-        ?.phone ?? '',
+        ?.phone ??
+      '',
 
     email:
-      item.email ?? '',
+      item.email ??
+      '',
 
     specialization:
       item.profile
@@ -184,7 +215,8 @@ function mapDetailLawyer(
       item.accountStatus,
 
     createdAt:
-      item.createdAt ?? '',
+      item.createdAt ??
+      '',
   }
 }
 
@@ -209,8 +241,6 @@ async function getLawyerPage(
   )
 }
 
-
-
 async function fetchAllLawyers(
   params: LawyerListParams,
 ) {
@@ -222,9 +252,13 @@ async function fetchAllLawyers(
 
   const totalPages =
     first.pagination
-      ?.totalPages ?? 1
+      ?.totalPages ??
+    1
 
-  if (totalPages <= 1) {
+  if (
+    totalPages <=
+    1
+  ) {
     return first.data
   }
 
@@ -233,9 +267,14 @@ async function fetchAllLawyers(
       Array.from(
         {
           length:
-            totalPages - 1,
+            totalPages -
+            1,
         },
-        (_, index) =>
+
+        (
+          _,
+          index,
+        ) =>
           getLawyerPage(
             params,
             index + 2,
@@ -247,7 +286,9 @@ async function fetchAllLawyers(
     ...first.data,
 
     ...otherPages.flatMap(
-      (result) =>
+      (
+        result,
+      ) =>
         result.data,
     ),
   ]
@@ -270,17 +311,26 @@ function sortLawyers(
       ? -1
       : 1
 
-  return [...lawyers].sort(
-    (a, b) => {
-      let comparison = 0
+  return [
+    ...lawyers,
+  ].sort(
+    (
+      a,
+      b,
+    ) => {
+      let comparison =
+        0
 
-      switch (sortBy) {
+      switch (
+        sortBy
+      ) {
         case 'fullName':
           comparison =
             a.fullName.localeCompare(
               b.fullName,
               'fa-IR',
             )
+
           break
 
         case 'state':
@@ -288,6 +338,7 @@ function sortLawyers(
             a.state.localeCompare(
               b.state,
             )
+
           break
 
         case 'createdAt':
@@ -298,6 +349,7 @@ function sortLawyers(
             new Date(
               b.createdAt,
             ).getTime()
+
           break
       }
 
@@ -343,26 +395,88 @@ export async function getLawyer(
   )
 }
 
+export async function createLawyer(
+  payload: CreateLawyerPayload,
+): Promise<Lawyer> {
+  const response =
+    await apiRequest<LawyerResponse>(
+      API_ENDPOINTS.lawyers,
+      {
+        method:
+          'POST',
+
+        body:
+          JSON.stringify({
+            firstName:
+              payload.firstName.trim(),
+
+            lastName:
+              payload.lastName.trim(),
+
+            ...(payload.phone?.trim()
+              ? {
+                  phone:
+                    payload.phone.trim(),
+                }
+              : {}),
+
+            ...(payload.email?.trim()
+              ? {
+                  email:
+                    payload.email
+                      .trim()
+                      .toLowerCase(),
+                }
+              : {}),
+
+            password:
+              payload.password,
+
+            ...(payload.specialization?.trim()
+              ? {
+                  specialization:
+                    payload.specialization.trim(),
+                }
+              : {}),
+
+            ...(payload.licenseNumber?.trim()
+              ? {
+                  licenseNumber:
+                    payload.licenseNumber.trim(),
+                }
+              : {}),
+          }),
+      },
+    )
+
+  return mapDetailLawyer(
+    response.data,
+  )
+}
+
 export async function updateLawyerState(
   id: string,
   state: LawyerState,
 ): Promise<Lawyer> {
-
-  
   await apiRequest(
     API_ENDPOINTS.lawyerStatus(
       id,
     ),
     {
-      method: 'PATCH',
+      method:
+        'PATCH',
 
-      body: JSON.stringify({
-        status: state,
-      }),
+      body:
+        JSON.stringify({
+          status:
+            state,
+        }),
     },
   )
 
-  return getLawyer(id)
+  return getLawyer(
+    id,
+  )
 }
 
 export async function updateLawyerAccountStatus(
@@ -374,16 +488,20 @@ export async function updateLawyerAccountStatus(
       id,
     ),
     {
-      method: 'PATCH',
+      method:
+        'PATCH',
 
-      body: JSON.stringify({
-        status:
-          accountStatus,
-      }),
+      body:
+        JSON.stringify({
+          status:
+            accountStatus,
+        }),
     },
   )
 
-  return getLawyer(id)
+  return getLawyer(
+    id,
+  )
 }
 
 export async function updateLawyerPassword(
@@ -395,12 +513,14 @@ export async function updateLawyerPassword(
       id,
     ),
     {
-      method: 'PATCH',
+      method:
+        'PATCH',
 
-      body: JSON.stringify({
-        newPassword:
-          payload.password,
-      }),
+      body:
+        JSON.stringify({
+          newPassword:
+            payload.password,
+        }),
     },
   )
 }
