@@ -16,6 +16,7 @@ import {
   MessageSquareText,
   Scale,
   ShieldCheck,
+  UserPlus,
   Users,
   X,
 } from 'lucide-react'
@@ -76,9 +77,10 @@ const navGroups: NavGroup[] =
             'وکلا',
 
           description:
-            'احراز، تعلیق و مدیریت وکلا',
+            'مدیریت و افزودن وکیل',
 
-          icon: Scale,
+          icon:
+            Scale,
         },
 
         {
@@ -91,13 +93,29 @@ const navGroups: NavGroup[] =
           description:
             'مدیریت کاربران موکل',
 
-          icon: Users,
+          icon:
+            Users,
+        },
+
+        {
+          href:
+            '/client-lawyers',
+
+          label:
+            'وکلای بخش موکلین',
+
+          description:
+            'انتخاب وکیل برای نمایش به موکلین',
+
+          icon:
+            UserPlus,
         },
       ],
     },
 
     {
-      title: 'پشتیبانی',
+      title:
+        'پشتیبانی',
 
       items: [
         {
@@ -148,7 +166,8 @@ export default function AdminSidebar({
     }
 
     return (
-      pathname === href ||
+      pathname ===
+        href ||
       pathname.startsWith(
         `${href}/`,
       )
