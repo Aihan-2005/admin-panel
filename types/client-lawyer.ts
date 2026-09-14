@@ -1,15 +1,17 @@
 import type {
   Lawyer,
-} from '@/types/lawyer'
+} from "@/types/lawyer";
 
 export interface ClientLawyerPlacement {
-  lawyerId: string
+  lawyerId: string;
 
-  isFeatured: boolean
+  isFeatured: boolean;
 
-  displayOrder: number
+  displayOrder: number;
 
-  addedAt: string
+  addedAt:
+    | string
+    | null;
 }
 
 export interface ManagedClientLawyer
@@ -17,13 +19,15 @@ export interface ManagedClientLawyer
     ClientLawyerPlacement {}
 
 export interface AddClientLawyerPayload {
-  lawyerId: string
+  lawyerId: string;
 
-  isFeatured: boolean
+  isFeatured: boolean;
 
-  displayOrder: number
+  displayOrder: number;
 }
 
 export interface UpdateClientLawyerPayload {
-  isFeatured?: boolean
- }
+  isFeatured?: boolean;
+
+  displayOrder?: number;
+}

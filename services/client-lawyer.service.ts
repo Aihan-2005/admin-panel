@@ -1,354 +1,215 @@
+import { apiRequest } from "@/lib/api/client";
+
 import type {
   AddClientLawyerPayload,
   ClientLawyerPlacement,
   UpdateClientLawyerPayload,
-} from '@/types/client-lawyer'
+} from "@/types/client-lawyer";
 
-const STORAGE_KEY =
-  'dadyar-admin:client-lawyers:v1'
+const CLIENT_LAWYERS_ENDPOINT =
+  "/admin/client-lawyers";
 
-function normalizeOrders(
-  items: ClientLawyerPlacement[],
+interface ApiResponse<T> {
+  success: boolean;
+  data: T;
+}
+
+function sortPlacements(
+  placements: ClientLawyerPlacement[],
 ): ClientLawyerPlacement[] {
-  return [...items]
-    .sort(
-      (a, b) =>
-        a.displayOrder -
-        b.displayOrder,
-    )
-    .map(
-      (
-        item,
-        index,
-      ) => ({
-        ...item,
-
-        displayOrder:
-          index + 1,
-      }),
-    )
+  return [...placements].sort(
+    (a, b) =>
+      a.displayOrder -
+      b.displayOrder,
+  );
 }
 
-function readStorage(): ClientLawyerPlacement[] {
-  if (
-    typeof window ===
-    'undefined'
-  ) {
-    return []
-  }
+async function fetchPlacements(): Promise<
+  ClientLawyerPlacement[]
+> {
+  const response =
+    await apiRequest<
+      ApiResponse<
+        ClientLawyerPlacement[]
+      >
+    >(
+      CLIENT_LAWYERS_ENDPOINT,
+      {
+        method: "GET",
+      },
+    );
 
-  try {
-    const raw =
-      window.localStorage.getItem(
-        STORAGE_KEY,
-      )
-
-    if (!raw) {
-      return []
-    }
-
-    const parsed =
-      JSON.parse(
-        raw,
-      ) as unknown
-
-    if (
-      !Array.isArray(
-        parsed,
-      )
-    ) {
-      return []
-    }
-
-    const items =
-      parsed
-        .filter(
-          (
-            item,
-          ): item is ClientLawyerPlacement => {
-            if (
-              !item ||
-              typeof item !==
-                'object'
-            ) {
-              return false
-            }
-
-            const record =
-              item as Record<
-                string,
-                unknown
-              >
-
-            return (
-              typeof record.lawyerId ===
-                'string' &&
-              typeof record.isFeatured ===
-                'boolean' &&
-              typeof record.displayOrder ===
-                'number' &&
-              typeof record.addedAt ===
-                'string'
-            )
-          },
-        )
-        .map(
-          (
-            item,
-          ) => ({
-            ...item,
-
-            displayOrder:
-              Math.max(
-                1,
-                Math.trunc(
-                  item.displayOrder,
-                ),
-              ),
-          }),
-        )
-
-    return normalizeOrders(
-      items,
-    )
-  } catch {
-    return []
-  }
-}
-
-function writeStorage(
-  items: ClientLawyerPlacement[],
-) {
-  if (
-    typeof window ===
-    'undefined'
-  ) {
-    return
-  }
-
-  window.localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify(
-      normalizeOrders(
-        items,
-      ),
-    ),
-  )
+  return sortPlacements(
+    response.data,
+  );
 }
 
 export async function getClientLawyerPlacements(): Promise<
   ClientLawyerPlacement[]
 > {
-  return readStorage()
+  return fetchPlacements();
 }
 
 export async function addClientLawyer(
   payload: AddClientLawyerPayload,
-): Promise<ClientLawyerPlacement[]> {
-  const current =
-    readStorage()
-
-  const exists =
-    current.some(
-      (item) =>
-        item.lawyerId ===
-        payload.lawyerId,
-    )
-
-  if (exists) {
-    throw new Error(
-      'این وکیل قبلاً به بخش موکلین اضافه شده است.',
-    )
-  }
-
-  const sorted =
-    normalizeOrders(
-      current,
-    )
-
-  const targetIndex =
-    Math.max(
-      0,
-      Math.min(
-        sorted.length,
-        Math.trunc(
-          payload.displayOrder,
-        ) - 1,
-      ),
-    )
-
-  const newItem: ClientLawyerPlacement =
+): Promise<
+  ClientLawyerPlacement[]
+> {
+  await apiRequest<
+    ApiResponse<ClientLawyerPlacement>
+  >(
+    `${CLIENT_LAWYERS_ENDPOINT}/${payload.lawyerId}`,
     {
-      lawyerId:
-        payload.lawyerId,
+      method: "POST",
 
-      isFeatured:
-        payload.isFeatured,
+      headers: {
+        "Content-Type":
+          "application/json",
+      },
 
-      displayOrder:
-        targetIndex + 1,
+      body: JSON.stringify({
+        isFeatured:
+          payload.isFeatured,
 
-      addedAt:
-        new Date().toISOString(),
-    }
+        displayOrder:
+          payload.displayOrder,
+      }),
+    },
+  );
 
-  sorted.splice(
-    targetIndex,
-    0,
-    newItem,
-  )
-
-  const result =
-    normalizeOrders(
-      sorted,
-    )
-
-  writeStorage(
-    result,
-  )
-
-  return result
+  return fetchPlacements();
 }
 
 export async function updateClientLawyer(
   lawyerId: string,
   payload: UpdateClientLawyerPayload,
-): Promise<ClientLawyerPlacement[]> {
-  const current =
-    readStorage()
+): Promise<
+  ClientLawyerPlacement[]
+> {
+  const body:
+    UpdateClientLawyerPayload =
+    {};
 
-  const exists =
-    current.some(
-      (item) =>
-        item.lawyerId ===
-        lawyerId,
-    )
-
-  if (!exists) {
-    throw new Error(
-      'وکیل موردنظر در بخش موکلین وجود ندارد.',
-    )
+  if (
+    payload.isFeatured !==
+    undefined
+  ) {
+    body.isFeatured =
+      payload.isFeatured;
   }
 
-  const result =
-    current.map(
-      (item) =>
-        item.lawyerId ===
-        lawyerId
-          ? {
-              ...item,
+  if (
+    payload.displayOrder !==
+    undefined
+  ) {
+    body.displayOrder =
+      payload.displayOrder;
+  }
 
-              ...(typeof payload.isFeatured ===
-              'boolean'
-                ? {
-                    isFeatured:
-                      payload.isFeatured,
-                  }
-                : {}),
-            }
-          : item,
-    )
+  await apiRequest<
+    ApiResponse<ClientLawyerPlacement>
+  >(
+    `${CLIENT_LAWYERS_ENDPOINT}/${lawyerId}`,
+    {
+      method: "PATCH",
 
-  writeStorage(
-    result,
-  )
+      headers: {
+        "Content-Type":
+          "application/json",
+      },
 
-  return normalizeOrders(
-    result,
-  )
+      body:
+        JSON.stringify(
+          body,
+        ),
+    },
+  );
+
+  return fetchPlacements();
 }
 
 export async function removeClientLawyer(
   lawyerId: string,
-): Promise<ClientLawyerPlacement[]> {
-  const current =
-    readStorage()
+): Promise<
+  ClientLawyerPlacement[]
+> {
+  await apiRequest<{
+    success: boolean;
+  }>(
+    `${CLIENT_LAWYERS_ENDPOINT}/${lawyerId}`,
+    {
+      method:
+        "DELETE",
+    },
+  );
 
-  const result =
-    normalizeOrders(
-      current.filter(
-        (item) =>
-          item.lawyerId !==
-          lawyerId,
-      ),
-    )
-
-  writeStorage(
-    result,
-  )
-
-  return result
+  return fetchPlacements();
 }
 
 export async function moveClientLawyer(
   lawyerId: string,
+
   direction:
-    | 'up'
-    | 'down',
-): Promise<ClientLawyerPlacement[]> {
-  const items =
-    normalizeOrders(
-      readStorage(),
-    )
+    | "up"
+    | "down",
+): Promise<
+  ClientLawyerPlacement[]
+> {
+  const placements =
+    await fetchPlacements();
 
-  const index =
-    items.findIndex(
-      (item) =>
-        item.lawyerId ===
+  const currentIndex =
+    placements.findIndex(
+      (placement) =>
+        placement.lawyerId ===
         lawyerId,
-    )
+    );
 
-  if (index === -1) {
-    return items
+  if (
+    currentIndex ===
+    -1
+  ) {
+    return placements;
   }
 
   const targetIndex =
-    direction ===
-    'up'
-      ? index - 1
-      : index + 1
+    direction === "up"
+      ? currentIndex - 1
+      : currentIndex + 1;
 
   if (
-    targetIndex <
-      0 ||
+    targetIndex < 0 ||
     targetIndex >=
-      items.length
+      placements.length
   ) {
-    return items
+    return placements;
   }
 
-  const next = [
-    ...items,
-  ]
+  const target =
+    placements[
+      targetIndex
+    ];
 
-  const currentItem =
-    next[index]
+  await apiRequest<
+    ApiResponse<ClientLawyerPlacement>
+  >(
+    `${CLIENT_LAWYERS_ENDPOINT}/${lawyerId}`,
+    {
+      method:
+        "PATCH",
 
-  const targetItem =
-    next[targetIndex]
+      headers: {
+        "Content-Type":
+          "application/json",
+      },
 
-  next[index] =
-    targetItem
+      body:
+        JSON.stringify({
+          displayOrder:
+            target.displayOrder,
+        }),
+    },
+  );
 
-  next[targetIndex] =
-    currentItem
-
-  const result =
-    next.map(
-      (
-        item,
-        itemIndex,
-      ) => ({
-        ...item,
-
-        displayOrder:
-          itemIndex + 1,
-      }),
-    )
-
-  writeStorage(
-    result,
-  )
-
-  return result
+  return fetchPlacements();
 }
