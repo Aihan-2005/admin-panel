@@ -14,6 +14,7 @@ import {
   CircleHelp,
   LayoutDashboard,
   MessageSquareText,
+  Package,
   Scale,
   ShieldCheck,
   UserPlus,
@@ -21,36 +22,50 @@ import {
   X,
 } from 'lucide-react'
 
-interface AdminSidebarProps {
-  isOpen: boolean
 
-  onClose: () => void
+interface AdminSidebarProps {
+  isOpen:
+    boolean
+
+  onClose:
+    () => void
 }
+
 
 interface NavItem {
-  href: string
+  href:
+    string
 
-  label: string
+  label:
+    string
 
-  description: string
+  description:
+    string
 
-  icon: LucideIcon
+  icon:
+    LucideIcon
 }
+
 
 interface NavGroup {
-  title: string
+  title:
+    string
 
-  items: NavItem[]
+  items:
+    NavItem[]
 }
 
-const navGroups: NavGroup[] =
-  [
+
+const navGroups:
+  NavGroup[] = [
     {
-      title: 'نمای کلی',
+      title:
+        'نمای کلی',
 
       items: [
         {
-          href: '/',
+          href:
+            '/',
 
           label:
             'داشبورد',
@@ -115,6 +130,27 @@ const navGroups: NavGroup[] =
 
     {
       title:
+        'اشتراک و فروش',
+
+      items: [
+        {
+          href:
+            '/subscription-plans',
+
+          label:
+            'پلن‌های اشتراکی',
+
+          description:
+            'ساخت و مدیریت پلن‌های قابل خرید',
+
+          icon:
+            Package,
+        },
+      ],
+    },
+
+    {
+      title:
         'پشتیبانی',
 
       items: [
@@ -149,6 +185,7 @@ const navGroups: NavGroup[] =
     },
   ]
 
+
 export default function AdminSidebar({
   isOpen,
   onClose,
@@ -156,14 +193,21 @@ export default function AdminSidebar({
   const pathname =
     usePathname()
 
+
   function isPathActive(
-    href: string,
+    href:
+      string,
   ) {
-    if (href === '/') {
+    if (
+      href ===
+      '/'
+    ) {
       return (
-        pathname === '/'
+        pathname ===
+        '/'
       )
     }
+
 
     return (
       pathname ===
@@ -174,18 +218,23 @@ export default function AdminSidebar({
     )
   }
 
+
   return (
     <>
-      {isOpen && (
-        <button
-          type="button"
-          aria-label="بستن منوی مدیریت"
-          onClick={
-            onClose
-          }
-          className="fixed inset-0 z-[60] bg-slate-950/45 backdrop-blur-sm lg:hidden"
-        />
-      )}
+      {
+        isOpen &&
+        (
+          <button
+            type="button"
+            aria-label="بستن منوی مدیریت"
+            onClick={
+              onClose
+            }
+            className="fixed inset-0 z-[60] bg-slate-950/45 backdrop-blur-sm lg:hidden"
+          />
+        )
+      }
+
 
       <aside
         className={`fixed right-0 top-0 z-[70] flex h-screen w-[290px] flex-col border-l border-slate-200 bg-white shadow-2xl transition-transform duration-300 lg:sticky lg:w-72 lg:translate-x-0 lg:shadow-none ${
@@ -217,11 +266,13 @@ export default function AdminSidebar({
             </div>
           </Link>
 
+
           <button
             type="button"
             onClick={
               onClose
             }
+            aria-label="بستن منو"
             className="rounded-xl p-2 lg:hidden"
           >
             <X
@@ -230,94 +281,106 @@ export default function AdminSidebar({
           </button>
         </div>
 
+
         <nav className="flex-1 overflow-y-auto px-3 py-4">
           <div className="space-y-6">
-            {navGroups.map(
-              (group) => (
-                <section
-                  key={
-                    group.title
-                  }
-                >
-                  <p className="mb-2 px-3 text-[11px] font-black text-slate-400">
-                    {
+            {
+              navGroups.map(
+                (
+                  group,
+                ) => (
+                  <section
+                    key={
                       group.title
                     }
-                  </p>
+                  >
+                    <p className="mb-2 px-3 text-[11px] font-black text-slate-400">
+                      {
+                        group.title
+                      }
+                    </p>
 
-                  <div className="space-y-1.5">
-                    {group.items.map(
-                      (
-                        item,
-                      ) => {
-                        const Icon =
-                          item.icon
 
-                        const active =
-                          isPathActive(
-                            item.href,
-                          )
+                    <div className="space-y-1.5">
+                      {
+                        group.items.map(
+                          (
+                            item,
+                          ) => {
+                            const Icon =
+                              item.icon
 
-                        return (
-                          <Link
-                            key={
-                              item.href
-                            }
-                            href={
-                              item.href
-                            }
-                            onClick={
-                              onClose
-                            }
-                            className={`flex items-center gap-3 rounded-2xl px-3 py-3 transition ${
-                              active
-                                ? 'bg-gradient-to-l from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-200/80'
-                                : 'text-slate-700 hover:bg-blue-50'
-                            }`}
-                          >
-                            <span
-                              className={`flex h-10 w-10 items-center justify-center rounded-xl ${
-                                active
-                                  ? 'bg-white/15'
-                                  : 'bg-slate-100'
-                              }`}
-                            >
-                              <Icon
-                                size={
-                                  19
+
+                            const active =
+                              isPathActive(
+                                item.href,
+                              )
+
+
+                            return (
+                              <Link
+                                key={
+                                  item.href
                                 }
-                              />
-                            </span>
-
-                            <span className="min-w-0">
-                              <span className="block text-sm font-black">
-                                {
-                                  item.label
+                                href={
+                                  item.href
                                 }
-                              </span>
-
-                              <span
-                                className={`mt-0.5 block truncate text-[11px] ${
+                                onClick={
+                                  onClose
+                                }
+                                className={`flex items-center gap-3 rounded-2xl px-3 py-3 transition ${
                                   active
-                                    ? 'text-blue-100'
-                                    : 'text-slate-400'
+                                    ? 'bg-gradient-to-l from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-200/80'
+                                    : 'text-slate-700 hover:bg-blue-50'
                                 }`}
                               >
-                                {
-                                  item.description
-                                }
-                              </span>
-                            </span>
-                          </Link>
+                                <span
+                                  className={`flex h-10 w-10 items-center justify-center rounded-xl ${
+                                    active
+                                      ? 'bg-white/15'
+                                      : 'bg-slate-100'
+                                  }`}
+                                >
+                                  <Icon
+                                    size={
+                                      19
+                                    }
+                                  />
+                                </span>
+
+
+                                <span className="min-w-0">
+                                  <span className="block text-sm font-black">
+                                    {
+                                      item.label
+                                    }
+                                  </span>
+
+                                  <span
+                                    className={`mt-0.5 block truncate text-[11px] ${
+                                      active
+                                        ? 'text-blue-100'
+                                        : 'text-slate-400'
+                                    }`}
+                                  >
+                                    {
+                                      item.description
+                                    }
+                                  </span>
+                                </span>
+                              </Link>
+                            )
+                          },
                         )
-                      },
-                    )}
-                  </div>
-                </section>
-              ),
-            )}
+                      }
+                    </div>
+                  </section>
+                ),
+              )
+            }
           </div>
         </nav>
+
 
         <div className="border-t border-slate-200 p-4">
           <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-3.5">
@@ -332,9 +395,7 @@ export default function AdminSidebar({
             </div>
 
             <p className="mt-2 text-[11px] leading-5 text-emerald-700">
-              عملیات حساس فقط از
-              حساب ADMIN قابل انجام
-              است.
+              عملیات حساس فقط از حساب ADMIN قابل انجام است.
             </p>
           </div>
         </div>
