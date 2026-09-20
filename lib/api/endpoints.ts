@@ -48,6 +48,22 @@ export const API_ENDPOINTS = {
       `/admin/lawyers/${id}/password`,
 
 
+      
+  lawyerSubscriptions:
+    (
+      id:
+        string,
+    ) =>
+      `/admin/lawyers/${id}/subscriptions`,
+
+  lawyerCurrentSubscriptionCancel:
+    (
+      id:
+        string,
+    ) =>
+      `/admin/lawyers/${id}/subscriptions/current/cancel`,
+
+
   clients:
     '/admin/clients',
 
@@ -119,8 +135,6 @@ export const API_ENDPOINTS = {
       `/faq/${id}`,
 
 
-
-      
   subscriptionPlans:
     '/admin/subscription-plans',
 
