@@ -11,6 +11,7 @@ import type {
   SubscriptionPlan,
   SubscriptionPlanOptions,
   SubscriptionPlanPayload,
+  SubscriptionSettings,
   UpdateSubscriptionPlanPayload,
 } from '@/types/subscription-plan'
 
@@ -45,7 +46,11 @@ interface BackendSubscriptionPlan {
 
   tags?:
     unknown
+ 
+  durationDays?:
+    unknown
 
+ 
   durationMonths?:
     unknown
 
@@ -81,6 +86,65 @@ interface BackendSubscriptionOptions {
 }
 
 
+interface BackendSubscriptionSettings {
+  trialDays?:
+    unknown
+}
+
+
+const FEATURE_TRANSLATIONS:
+  Record<
+    string,
+    {
+      title:
+        string
+
+      description:
+        string
+    }
+  > = {
+    CASE_MANAGEMENT: {
+      title:
+        'مدیریت پرونده‌ها',
+
+      description:
+        'دسترسی به بخش مدیریت پرونده‌های وکیل.',
+    },
+
+    FINANCIAL_REPORTS: {
+      title:
+        'گزارش‌های مالی',
+
+      description:
+        'دسترسی به گزارش‌ها و نمای کلی مالی.',
+    },
+
+    SCHEDULING: {
+      title:
+        'زمان‌بندی و رزرو',
+
+      description:
+        'دسترسی به مدیریت زمان‌های آزاد و برنامه‌ریزی قرارها.',
+    },
+
+    ONLINE_MEETINGS: {
+      title:
+        'جلسات آنلاین',
+
+      description:
+        'امکان ایجاد و مدیریت جلسات آنلاین.',
+    },
+
+    CLIENT_DIRECTORY_VISIBILITY: {
+      title:
+        'نمایش در فهرست وکلا',
+
+      description:
+        'امکان نمایش وکیل در جستجو و فهرست وکلای بخش موکلین.',
+    },
+  }
+
+
 function isRecord(
   value:
     unknown,
@@ -112,11 +176,13 @@ function toOptionalString(
   value:
     unknown,
 ): string | undefined {
-  return typeof value ===
-      'string' &&
-    value.trim()
-    ? value
-    : undefined
+  const normalized =
+    toStringValue(
+      value,
+    ).trim()
+
+  return normalized ||
+    undefined
 }
 
 
@@ -127,13 +193,47 @@ function toNumberValue(
   fallback =
     0,
 ): number {
-  return typeof value ===
+  return (
+    typeof value ===
       'number' &&
     Number.isFinite(
       value,
     )
+  )
     ? value
     : fallback
+}
+
+
+function toPositiveInteger(
+  value:
+    unknown,
+
+  fallback:
+    number,
+): number {
+  const numeric =
+    toNumberValue(
+      value,
+      fallback,
+    )
+
+  if (
+    !Number.isFinite(
+      numeric,
+    ) ||
+    numeric <=
+      0
+  ) {
+    return fallback
+  }
+
+  return Math.max(
+    1,
+    Math.round(
+      numeric,
+    ),
+  )
 }
 
 
@@ -149,24 +249,27 @@ function toStringArray(
     return []
   }
 
-
-  return value
-    .filter(
-      (
-        item,
-      ): item is string =>
-        typeof item ===
-        'string',
-    )
-    .map(
-      (
-        item,
-      ) =>
-        item.trim(),
-    )
-    .filter(
-      Boolean,
-    )
+  return Array.from(
+    new Set(
+      value
+        .filter(
+          (
+            item,
+          ): item is string =>
+            typeof item ===
+            'string',
+        )
+        .map(
+          (
+            item,
+          ) =>
+            item.trim(),
+        )
+        .filter(
+          Boolean,
+        ),
+    ),
+  )
 }
 
 
@@ -182,14 +285,12 @@ function resolveId(
     return item.id
   }
 
-
   if (
     typeof item._id ===
       'string'
   ) {
     return item._id
   }
-
 
   if (
     item._id !==
@@ -202,8 +303,46 @@ function resolveId(
     )
   }
 
-
   return ''
+}
+
+
+function resolveDurationDays(
+  item:
+    BackendSubscriptionPlan,
+): number {
+  const explicitDays =
+    toNumberValue(
+      item.durationDays,
+      0,
+    )
+
+  if (
+    explicitDays >
+    0
+  ) {
+    return Math.round(
+      explicitDays,
+    )
+  }
+
+  const legacyMonths =
+    toNumberValue(
+      item.durationMonths,
+      0,
+    )
+
+  if (
+    legacyMonths >
+    0
+  ) {
+    return Math.round(
+      legacyMonths *
+        30,
+    )
+  }
+
+  return 30
 }
 
 
@@ -237,19 +376,32 @@ function mapSubscriptionPlan(
         item.tags,
       ),
 
-    durationMonths:
-      toNumberValue(
-        item.durationMonths,
+    durationDays:
+      resolveDurationDays(
+        item,
       ),
 
     price:
-      toNumberValue(
-        item.price,
+      Math.max(
+        0,
+        Math.round(
+          toNumberValue(
+            item.price,
+          ),
+        ),
       ),
 
     discountPercent:
-      toNumberValue(
-        item.discountPercent,
+      Math.min(
+        100,
+        Math.max(
+          0,
+          Math.round(
+            toNumberValue(
+              item.discountPercent,
+            ),
+          ),
+        ),
       ),
 
     features:
@@ -262,8 +414,13 @@ function mapSubscriptionPlan(
       true,
 
     sortOrder:
-      toNumberValue(
-        item.sortOrder,
+      Math.max(
+        0,
+        Math.round(
+          toNumberValue(
+            item.sortOrder,
+          ),
+        ),
       ),
 
     createdAt:
@@ -291,27 +448,10 @@ function normalizeFeature(
     return null
   }
 
-
   const code =
     toStringValue(
       value.code,
-    )
-      .trim()
-
-
-  const title =
-    toStringValue(
-      value.title,
-    )
-      .trim()
-
-
-  const description =
-    toStringValue(
-      value.description,
-    )
-      .trim()
-
+    ).trim()
 
   if (
     !code
@@ -319,15 +459,44 @@ function normalizeFeature(
     return null
   }
 
+  const translation =
+    FEATURE_TRANSLATIONS[
+      code
+    ]
+
+  if (
+    translation
+  ) {
+    return {
+      code,
+
+      title:
+        translation.title,
+
+      description:
+        translation.description,
+    }
+  }
+
+  const backendTitle =
+    toStringValue(
+      value.title,
+    ).trim()
+
+  const backendDescription =
+    toStringValue(
+      value.description,
+    ).trim()
 
   return {
     code,
 
     title:
-      title ||
+      backendTitle ||
       code,
 
-    description,
+    description:
+      backendDescription,
   }
 }
 
@@ -340,7 +509,6 @@ function normalizeOptions(
     toStringArray(
       value.tiers,
     )
-
 
   const features =
     Array.isArray(
@@ -359,26 +527,23 @@ function normalizeOptions(
           )
       : []
 
-
   if (
     tiers.length ===
     0
   ) {
     throw new Error(
-      'Backend هیچ tier معتبری برای پلن‌های اشتراکی برنگرداند.',
+      'هیچ سطح اشتراکی معتبری دریافت نشد.',
     )
   }
-
 
   if (
     features.length ===
     0
   ) {
     throw new Error(
-      'Backend هیچ feature معتبری برای پلن‌های اشتراکی برنگرداند.',
+      'هیچ قابلیت معتبری برای پلن‌ها دریافت نشد.',
     )
   }
-
 
   return {
     tiers:
@@ -422,8 +587,54 @@ function assertSuccess<T>(
     )
   }
 
-
   return response.data
+}
+
+
+ 
+function toBackendPlanPayload(
+  input:
+    SubscriptionPlanPayload |
+    UpdateSubscriptionPlanPayload,
+): Record<
+  string,
+  unknown
+> {
+  const {
+    durationDays,
+    ...rest
+  } =
+    input
+
+  const result:
+    Record<
+      string,
+      unknown
+    > = {
+      ...rest,
+    }
+
+  if (
+    durationDays ===
+    undefined
+  ) {
+    return result
+  }
+
+  if (
+    durationDays %
+      30 ===
+    0
+  ) {
+    result.durationMonths =
+      durationDays /
+      30
+  } else {
+    result.durationDays =
+      durationDays
+  }
+
+  return result
 }
 
 
@@ -437,16 +648,11 @@ export async function getSubscriptionPlanOptions():
         .subscriptionPlanOptions,
     )
 
-
-  const data =
+  return normalizeOptions(
     assertSuccess(
       response,
       'دریافت تنظیمات پلن‌ها ناموفق بود.',
-    )
-
-
-  return normalizeOptions(
-    data,
+    ),
   )
 }
 
@@ -463,13 +669,11 @@ export async function getAdminSubscriptionPlans():
         .subscriptionPlans,
     )
 
-
   const data =
     assertSuccess(
       response,
       'دریافت پلن‌های اشتراکی ناموفق بود.',
     )
-
 
   if (
     !Array.isArray(
@@ -477,10 +681,9 @@ export async function getAdminSubscriptionPlans():
     )
   ) {
     throw new Error(
-      'ساختار پاسخ لیست پلن‌های اشتراکی معتبر نیست.',
+      'ساختار پاسخ لیست پلن‌ها معتبر نیست.',
     )
   }
-
 
   return data
     .map(
@@ -514,21 +717,18 @@ export async function createSubscriptionPlan(
 
         body:
           JSON.stringify(
-            input,
+            toBackendPlanPayload(
+              input,
+            ),
           ),
       },
     )
 
-
-  const data =
+  return mapSubscriptionPlan(
     assertSuccess(
       response,
       'ساخت پلن اشتراکی ناموفق بود.',
-    )
-
-
-  return mapSubscriptionPlan(
-    data,
+    ),
   )
 }
 
@@ -543,15 +743,13 @@ export async function updateSubscriptionPlan(
   const normalizedId =
     id.trim()
 
-
   if (
     !normalizedId
   ) {
     throw new Error(
-      'شناسه پلن اشتراکی معتبر نیست.',
+      'شناسه پلن معتبر نیست.',
     )
   }
-
 
   const response =
     await apiRequest<
@@ -568,20 +766,95 @@ export async function updateSubscriptionPlan(
 
         body:
           JSON.stringify(
-            input,
+            toBackendPlanPayload(
+              input,
+            ),
           ),
       },
     )
 
+  return mapSubscriptionPlan(
+    assertSuccess(
+      response,
+      'ویرایش پلن اشتراکی ناموفق بود.',
+    ),
+  )
+}
+
+
+export async function getSubscriptionSettings():
+  Promise<SubscriptionSettings> {
+  const response =
+    await apiRequest<
+      ApiEnvelope<BackendSubscriptionSettings>
+    >(
+      API_ENDPOINTS
+        .subscriptionSettings,
+    )
 
   const data =
     assertSuccess(
       response,
-      'ویرایش پلن اشتراکی ناموفق بود.',
+      'دریافت تنظیمات دوره رایگان ناموفق بود.',
     )
 
+  return {
+    trialDays:
+      toPositiveInteger(
+        data.trialDays,
+        14,
+      ),
+  }
+}
 
-  return mapSubscriptionPlan(
-    data,
-  )
+
+export async function updateSubscriptionSettings(
+  trialDays:
+    number,
+): Promise<SubscriptionSettings> {
+  if (
+    !Number.isInteger(
+      trialDays,
+    ) ||
+    trialDays <
+      1 ||
+    trialDays >
+      365
+  ) {
+    throw new Error(
+      'تعداد روزهای دوره رایگان باید بین ۱ تا ۳۶۵ روز باشد.',
+    )
+  }
+
+  const response =
+    await apiRequest<
+      ApiEnvelope<BackendSubscriptionSettings>
+    >(
+      API_ENDPOINTS
+        .subscriptionSettings,
+
+      {
+        method:
+          'PATCH',
+
+        body:
+          JSON.stringify({
+            trialDays,
+          }),
+      },
+    )
+
+  const data =
+    assertSuccess(
+      response,
+      'ذخیره تنظیمات دوره رایگان ناموفق بود.',
+    )
+
+  return {
+    trialDays:
+      toPositiveInteger(
+        data.trialDays,
+        trialDays,
+      ),
+  }
 }

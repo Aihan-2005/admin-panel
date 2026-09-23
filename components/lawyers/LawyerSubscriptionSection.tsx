@@ -54,10 +54,10 @@ import type {
 
 interface LawyerSubscriptionSectionProps {
   lawyerId:
-    string
+  string
 
   lawyerName:
-    string
+  string
 }
 
 
@@ -70,15 +70,15 @@ const STATUS_LABELS:
     LawyerSubscriptionStatus,
     string
   > = {
-    ACTIVE:
-      'فعال',
+  ACTIVE:
+    'فعال',
 
-    EXPIRED:
-      'منقضی‌شده',
+  EXPIRED:
+    'منقضی‌شده',
 
-    CANCELLED:
-      'لغوشده',
-  }
+  CANCELLED:
+    'لغوشده',
+}
 
 
 const STATUS_CLASSES:
@@ -86,15 +86,15 @@ const STATUS_CLASSES:
     LawyerSubscriptionStatus,
     string
   > = {
-    ACTIVE:
-      'border-emerald-200 bg-emerald-50 text-emerald-700',
+  ACTIVE:
+    'border-emerald-200 bg-emerald-50 text-emerald-700',
 
-    EXPIRED:
-      'border-amber-200 bg-amber-50 text-amber-700',
+  EXPIRED:
+    'border-amber-200 bg-amber-50 text-amber-700',
 
-    CANCELLED:
-      'border-red-200 bg-red-50 text-red-700',
-  }
+  CANCELLED:
+    'border-red-200 bg-red-50 text-red-700',
+}
 
 
 const SOURCE_LABELS:
@@ -102,12 +102,12 @@ const SOURCE_LABELS:
     LawyerSubscriptionActivationSource,
     string
   > = {
-    ADMIN:
-      'فعال‌سازی دستی ادمین',
+  ADMIN:
+    'فعال‌سازی دستی ادمین',
 
-    PAYMENT:
-      'خرید / پرداخت',
-  }
+  PAYMENT:
+    'خرید / پرداخت',
+}
 
 
 const TIER_LABELS:
@@ -115,15 +115,15 @@ const TIER_LABELS:
     string,
     string
   > = {
-    BASIC:
-      'پایه',
+  BASIC:
+    'پایه',
 
-    STANDARD:
-      'استاندارد',
+  STANDARD:
+    'استاندارد',
 
-    PREMIUM:
-      'حرفه‌ای',
-  }
+  PREMIUM:
+    'حرفه‌ای',
+}
 
 
 function formatDateTime(
@@ -178,6 +178,47 @@ function formatNumber(
     value,
   )
 }
+function formatPlanDuration(
+  durationDays:
+    number,
+): string {
+  const normalized =
+    Math.max(
+      1,
+      Math.round(
+        durationDays,
+      ),
+    )
+
+
+  if (
+    normalized %
+    30 ===
+    0
+  ) {
+    return `${formatNumber(
+      normalized /
+      30,
+    )} ماه`
+  }
+
+
+  if (
+    normalized %
+    7 ===
+    0
+  ) {
+    return `${formatNumber(
+      normalized /
+      7,
+    )} هفته`
+  }
+
+
+  return `${formatNumber(
+    normalized,
+  )} روز`
+}
 
 
 function getFinalPrice(
@@ -193,17 +234,17 @@ function getFinalPrice(
 
     Math.round(
       plan.price *
-        (
-          1 -
-          Math.min(
-            100,
-            Math.max(
-              0,
-              plan.discountPercent,
-            ),
-          ) /
-            100
-        ),
+      (
+        1 -
+        Math.min(
+          100,
+          Math.max(
+            0,
+            plan.discountPercent,
+          ),
+        ) /
+        100
+      ),
     ),
   )
 }
@@ -394,9 +435,9 @@ export default function LawyerSubscriptionSection({
             (
               feature,
             ) => [
-              feature.code,
-              feature.title,
-            ],
+                feature.code,
+                feature.title,
+              ],
           ),
         ),
 
@@ -434,8 +475,8 @@ export default function LawyerSubscriptionSection({
             nextOptions,
           )
         } catch (
-          caughtError:
-            unknown
+        caughtError:
+          unknown
         ) {
           setError(
             caughtError instanceof
@@ -488,21 +529,21 @@ export default function LawyerSubscriptionSection({
               ),
 
               requestedPage ===
-              1
+                1
                 ? Promise.resolve(
-                    null,
-                  )
+                  null,
+                )
                 : getLawyerSubscriptionHistory(
-                    lawyerId,
+                  lawyerId,
 
-                    {
-                      page:
-                        1,
+                  {
+                    page:
+                      1,
 
-                      limit:
-                        1,
-                    },
-                  ),
+                    limit:
+                      1,
+                  },
+                ),
             ])
 
 
@@ -536,8 +577,8 @@ export default function LawyerSubscriptionSection({
             null,
           )
         } catch (
-          caughtError:
-            unknown
+        caughtError:
+          unknown
         ) {
           setError(
             caughtError instanceof
@@ -679,8 +720,8 @@ export default function LawyerSubscriptionSection({
         )
       }
     } catch (
-      caughtError:
-        unknown
+    caughtError:
+      unknown
     ) {
       setError(
         caughtError instanceof
@@ -759,8 +800,8 @@ export default function LawyerSubscriptionSection({
         )
       }
     } catch (
-      caughtError:
-        unknown
+    caughtError:
+      unknown
     ) {
       setError(
         caughtError instanceof
@@ -925,7 +966,7 @@ export default function LawyerSubscriptionSection({
                             currentSubscription,
                           ) ||
                           action !==
-                            null
+                          null
                         }
                         onChange={(
                           event,
@@ -955,17 +996,16 @@ export default function LawyerSubscriptionSection({
                                 {' — '}
                                 {
                                   TIER_LABELS[
-                                    plan.tier
+                                  plan.tier
                                   ] ??
                                   plan.tier
                                 }
                                 {' — '}
                                 {
-                                  formatNumber(
-                                    plan.durationMonths,
+                                  formatPlanDuration(
+                                    plan.durationDays,
                                   )
                                 }
-                                {' ماه'}
                               </option>
                             ),
                           )
@@ -983,9 +1023,11 @@ export default function LawyerSubscriptionSection({
                               CalendarClock
                             }
                             label="مدت"
-                            value={`${formatNumber(
-                              selectedPlan.durationMonths,
-                            )} ماه`}
+                            value={
+                              formatPlanDuration(
+                                selectedPlan.durationDays,
+                              )
+                            }
                           />
 
                           <SmallInfo
@@ -1012,7 +1054,7 @@ export default function LawyerSubscriptionSection({
                         ) ||
                         !selectedPlan ||
                         action !==
-                          null
+                        null
                       }
                       onClick={() => {
                         void handleActivate()
@@ -1021,7 +1063,7 @@ export default function LawyerSubscriptionSection({
                     >
                       {
                         action ===
-                        'ACTIVATE'
+                          'ACTIVATE'
                           ? (
                             <Loader2
                               size={17}
@@ -1039,7 +1081,7 @@ export default function LawyerSubscriptionSection({
                         currentSubscription
                           ? 'وکیل اشتراک فعال دارد'
                           : action ===
-                              'ACTIVATE'
+                            'ACTIVATE'
                             ? 'در حال فعال‌سازی...'
                             : 'فعال‌سازی دستی اشتراک'
                       }
@@ -1160,7 +1202,7 @@ export default function LawyerSubscriptionSection({
                                 <p className="mt-1 text-xs font-bold text-violet-600">
                                   {
                                     TIER_LABELS[
-                                      subscription.planSnapshot.tier
+                                    subscription.planSnapshot.tier
                                     ] ??
                                     subscription.planSnapshot.tier
                                   }
@@ -1204,16 +1246,15 @@ export default function LawyerSubscriptionSection({
 
                               <td className="px-4 py-4">
                                 <span
-                                  className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${
-                                    subscription.activationSource ===
-                                    'PAYMENT'
+                                  className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${subscription.activationSource ===
+                                      'PAYMENT'
                                       ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
                                       : 'border-blue-200 bg-blue-50 text-blue-700'
-                                  }`}
+                                    }`}
                                 >
                                   {
                                     SOURCE_LABELS[
-                                      subscription.activationSource
+                                    subscription.activationSource
                                     ]
                                   }
                                 </span>
@@ -1334,7 +1375,7 @@ export default function LawyerSubscriptionSection({
                   type="button"
                   disabled={
                     page <=
-                      1 ||
+                    1 ||
                     historyLoading
                   }
                   onClick={() =>
@@ -1345,7 +1386,7 @@ export default function LawyerSubscriptionSection({
                         Math.max(
                           1,
                           current -
-                            1,
+                          1,
                         ),
                     )
                   }
@@ -1363,7 +1404,7 @@ export default function LawyerSubscriptionSection({
                   type="button"
                   disabled={
                     page >=
-                      totalPages ||
+                    totalPages ||
                     historyLoading
                   }
                   onClick={() =>
@@ -1374,7 +1415,7 @@ export default function LawyerSubscriptionSection({
                         Math.min(
                           totalPages,
                           current +
-                            1,
+                          1,
                         ),
                     )
                   }
@@ -1404,22 +1445,22 @@ function CurrentSubscriptionCard({
   onCancel,
 }: {
   subscription:
-    LawyerSubscription | null
+  LawyerSubscription | null
 
   featureTitles:
-    Map<
-      string,
-      string
-    >
+  Map<
+    string,
+    string
+  >
 
   loading:
-    boolean
+  boolean
 
   cancelling:
-    boolean
+  boolean
 
   onCancel:
-    () => void |
+  () => void |
     Promise<void>
 }) {
   if (
@@ -1482,7 +1523,7 @@ function CurrentSubscriptionCard({
           <p className="mt-1 text-xs font-black text-violet-700">
             {
               TIER_LABELS[
-                subscription.planSnapshot.tier
+              subscription.planSnapshot.tier
               ] ??
               subscription.planSnapshot.tier
             }
@@ -1491,16 +1532,15 @@ function CurrentSubscriptionCard({
 
 
         <span
-          className={`rounded-full border px-2.5 py-1 text-xs font-black ${
-            subscription.activationSource ===
-            'PAYMENT'
+          className={`rounded-full border px-2.5 py-1 text-xs font-black ${subscription.activationSource ===
+              'PAYMENT'
               ? 'border-emerald-200 bg-white text-emerald-700'
               : 'border-blue-200 bg-blue-50 text-blue-700'
-          }`}
+            }`}
         >
           {
             SOURCE_LABELS[
-              subscription.activationSource
+            subscription.activationSource
             ]
           }
         </span>
@@ -1628,19 +1668,18 @@ function StatusBadge({
   status,
 }: {
   status:
-    LawyerSubscriptionStatus
+  LawyerSubscriptionStatus
 }) {
   return (
     <span
-      className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${
-        STATUS_CLASSES[
-          status
+      className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${STATUS_CLASSES[
+        status
         ]
-      }`}
+        }`}
     >
       {
         STATUS_LABELS[
-          status
+        status
         ]
       }
     </span>
@@ -1650,18 +1689,18 @@ function StatusBadge({
 
 function SmallInfo({
   icon:
-    Icon,
+  Icon,
   label,
   value,
 }: {
   icon:
-    typeof Clock3
+  typeof Clock3
 
   label:
-    string
+  string
 
   value:
-    string
+  string
 }) {
   return (
     <div className="rounded-xl border border-zinc-200 bg-white p-3">

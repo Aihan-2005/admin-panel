@@ -1,10 +1,12 @@
 export type SubscriptionTier =
   string
 
-
 export type SubscriptionFeatureCode =
   string
 
+export type SubscriptionDurationUnit =
+  | 'WEEK'
+  | 'MONTH'
 
 export interface SubscriptionFeatureOption {
   code:
@@ -17,7 +19,6 @@ export interface SubscriptionFeatureOption {
     string
 }
 
-
 export interface SubscriptionPlanOptions {
   tiers:
     SubscriptionTier[]
@@ -25,7 +26,6 @@ export interface SubscriptionPlanOptions {
   features:
     SubscriptionFeatureOption[]
 }
-
 
 export interface SubscriptionPlan {
   id:
@@ -43,7 +43,14 @@ export interface SubscriptionPlan {
   tags:
     string[]
 
-  durationMonths:
+  /**
+   * Canonical duration used by the frontend.
+   *
+   * 2 weeks  = 14
+   * 1 month  = 30
+   * 3 months = 90
+   */
+  durationDays:
     number
 
   price:
@@ -68,7 +75,6 @@ export interface SubscriptionPlan {
     string
 }
 
-
 export interface SubscriptionPlanPayload {
   title:
     string
@@ -82,7 +88,7 @@ export interface SubscriptionPlanPayload {
   tags:
     string[]
 
-  durationMonths:
+  durationDays:
     number
 
   price:
@@ -101,6 +107,10 @@ export interface SubscriptionPlanPayload {
     number
 }
 
-
 export type UpdateSubscriptionPlanPayload =
   Partial<SubscriptionPlanPayload>
+
+export interface SubscriptionSettings {
+  trialDays:
+    number
+}

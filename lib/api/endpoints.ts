@@ -11,10 +11,8 @@ export const API_ENDPOINTS = {
   authLogout:
     '/auth/logout',
 
-
   dashboard:
     '/admin/dashboard',
-
 
   lawyers:
     '/admin/lawyers',
@@ -47,8 +45,6 @@ export const API_ENDPOINTS = {
     ) =>
       `/admin/lawyers/${id}/password`,
 
-
-      
   lawyerSubscriptions:
     (
       id:
@@ -62,7 +58,6 @@ export const API_ENDPOINTS = {
         string,
     ) =>
       `/admin/lawyers/${id}/subscriptions/current/cancel`,
-
 
   clients:
     '/admin/clients',
@@ -87,7 +82,6 @@ export const API_ENDPOINTS = {
         string,
     ) =>
       `/admin/clients/${id}/password`,
-
 
   tickets:
     '/admin/tickets',
@@ -123,7 +117,6 @@ export const API_ENDPOINTS = {
     ) =>
       `/admin/tickets/${ticketId}/messages/${messageId}/attachment`,
 
-
   faq:
     '/faq',
 
@@ -133,7 +126,6 @@ export const API_ENDPOINTS = {
         string,
     ) =>
       `/faq/${id}`,
-
 
   subscriptionPlans:
     '/admin/subscription-plans',
@@ -147,4 +139,8 @@ export const API_ENDPOINTS = {
         string,
     ) =>
       `/admin/subscription-plans/${id}`,
+
+ 
+subscriptionSettings:
+  '/admin/subscription-plans/settings',
 } as const

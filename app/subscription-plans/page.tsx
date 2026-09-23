@@ -7,10 +7,14 @@ import {
   useState,
 } from 'react'
 
+import type {
+  LucideIcon,
+} from 'lucide-react'
+
 import {
   CheckCircle2,
-  CircleDollarSign,
   Clock3,
+  Gift,
   Layers3,
   Loader2,
   Package,
@@ -19,7 +23,6 @@ import {
   Power,
   RefreshCcw,
   Search,
-  Tags,
   XCircle,
 } from 'lucide-react'
 
@@ -35,7 +38,9 @@ import {
   createSubscriptionPlan,
   getAdminSubscriptionPlans,
   getSubscriptionPlanOptions,
+  getSubscriptionSettings,
   updateSubscriptionPlan,
+  updateSubscriptionSettings,
 } from '@/services/subscription-plan.service'
 
 import type {
@@ -79,37 +84,54 @@ function formatNumber(
 }
 
 
-function getTierLabel(
-  tier:
-    string,
+function formatPrice(
+  value:
+    number,
 ): string {
-  const label =
-    TIER_LABELS[
-      tier
-    ]
-
-
-  return label
-    ? `${label} (${tier})`
-    : tier
+  return `${formatNumber(
+    value,
+  )} تومان`
 }
 
 
-function calculateFinalPrice(
+function formatDuration(
+  durationDays:
+    number,
+): string {
+  if (
+    durationDays %
+      30 ===
+    0
+  ) {
+    return `${formatNumber(
+      durationDays /
+        30,
+    )} ماه`
+  }
+
+  if (
+    durationDays %
+      7 ===
+    0
+  ) {
+    return `${formatNumber(
+      durationDays /
+        7,
+    )} هفته`
+  }
+
+  return `${formatNumber(
+    durationDays,
+  )} روز`
+}
+
+
+function finalPrice(
   plan:
     SubscriptionPlan,
 ): number {
-  if (
-    plan.discountPercent <=
-    0
-  ) {
-    return plan.price
-  }
-
-
   return Math.max(
     0,
-
     Math.round(
       plan.price *
         (
@@ -129,10 +151,7 @@ export default function SubscriptionPlansPage() {
   ] =
     useState<
       SubscriptionPlan[]
-    >(
-      [],
-    )
-
+    >([])
 
   const [
     options,
@@ -142,33 +161,37 @@ export default function SubscriptionPlansPage() {
       null,
     )
 
+  const [
+    trialDays,
+    setTrialDays,
+  ] =
+    useState(
+      '',
+    )
 
   const [
     loading,
     setLoading,
   ] =
-    useState(
-      true,
-    )
-
+    useState(true)
 
   const [
     refreshing,
     setRefreshing,
   ] =
-    useState(
-      false,
-    )
-
+    useState(false)
 
   const [
     saving,
     setSaving,
   ] =
-    useState(
-      false,
-    )
+    useState(false)
 
+  const [
+    savingTrial,
+    setSavingTrial,
+  ] =
+    useState(false)
 
   const [
     togglingId,
@@ -178,16 +201,6 @@ export default function SubscriptionPlansPage() {
       null,
     )
 
-
-  const [
-    formOpen,
-    setFormOpen,
-  ] =
-    useState(
-      false,
-    )
-
-
   const [
     editingPlan,
     setEditingPlan,
@@ -196,24 +209,23 @@ export default function SubscriptionPlansPage() {
       null,
     )
 
+  const [
+    formOpen,
+    setFormOpen,
+  ] =
+    useState(false)
 
   const [
     search,
     setSearch,
   ] =
-    useState(
-      '',
-    )
-
+    useState('')
 
   const [
     tierFilter,
     setTierFilter,
   ] =
-    useState(
-      'ALL',
-    )
-
+    useState('ALL')
 
   const [
     activeFilter,
@@ -223,7 +235,6 @@ export default function SubscriptionPlansPage() {
       'ALL',
     )
 
-
   const [
     error,
     setError,
@@ -232,6 +243,13 @@ export default function SubscriptionPlansPage() {
       null,
     )
 
+  const [
+    trialError,
+    setTrialError,
+  ] =
+    useState<string | null>(
+      null,
+    )
 
   const [
     success,
@@ -242,14 +260,14 @@ export default function SubscriptionPlansPage() {
     )
 
 
-  const loadAll =
+  const loadData =
     useCallback(
       async (
-        showInitialLoader =
+        initial =
           false,
       ) => {
         if (
-          showInitialLoader
+          initial
         ) {
           setLoading(
             true,
@@ -260,31 +278,67 @@ export default function SubscriptionPlansPage() {
           )
         }
 
-
         setError(
           null,
         )
 
-
         try {
           const [
-            planOptions,
-            planItems,
+            plansResult,
+            optionsResult,
+            settingsResult,
           ] =
-            await Promise.all([
-              getSubscriptionPlanOptions(),
-
+            await Promise.allSettled([
               getAdminSubscriptionPlans(),
+              getSubscriptionPlanOptions(),
+              getSubscriptionSettings(),
             ])
 
+          if (
+            plansResult.status ===
+            'rejected'
+          ) {
+            throw plansResult.reason
+          }
 
-          setOptions(
-            planOptions,
-          )
+          if (
+            optionsResult.status ===
+            'rejected'
+          ) {
+            throw optionsResult.reason
+          }
 
           setPlans(
-            planItems,
+            plansResult.value,
           )
+
+          setOptions(
+            optionsResult.value,
+          )
+
+          if (
+            settingsResult.status ===
+            'fulfilled'
+          ) {
+            setTrialDays(
+              String(
+                settingsResult
+                  .value
+                  .trialDays,
+              ),
+            )
+
+            setTrialError(
+              null,
+            )
+          } else {
+            setTrialError(
+              settingsResult.reason instanceof
+                Error
+                ? settingsResult.reason.message
+                : 'تنظیمات دوره رایگان در دسترس نیست.',
+            )
+          }
         } catch (
           caughtError:
             unknown
@@ -293,7 +347,7 @@ export default function SubscriptionPlansPage() {
             caughtError instanceof
               Error
               ? caughtError.message
-              : 'دریافت اطلاعات پلن‌های اشتراکی ناموفق بود.',
+              : 'دریافت پلن‌ها ناموفق بود.',
           )
         } finally {
           setLoading(
@@ -310,31 +364,15 @@ export default function SubscriptionPlansPage() {
     )
 
 
-  const refreshPlans =
-    useCallback(
-      async () => {
-        const items =
-          await getAdminSubscriptionPlans()
-
-
-        setPlans(
-          items,
-        )
-      },
-
-      [],
-    )
-
-
   useEffect(
     () => {
-      void loadAll(
+      void loadData(
         true,
       )
     },
 
     [
-      loadAll,
+      loadData,
     ],
   )
 
@@ -348,26 +386,26 @@ export default function SubscriptionPlansPage() {
         active:
           plans.filter(
             (
-              item,
+              plan,
             ) =>
-              item.isActive,
+              plan.isActive,
           ).length,
 
         inactive:
           plans.filter(
             (
-              item,
+              plan,
             ) =>
-              !item.isActive,
+              !plan.isActive,
           ).length,
 
         tiers:
           new Set(
             plans.map(
               (
-                item,
+                plan,
               ) =>
-                item.tier,
+                plan.tier,
             ),
           ).size,
       }),
@@ -388,7 +426,6 @@ export default function SubscriptionPlansPage() {
               'fa-IR',
             )
 
-
         return plans.filter(
           (
             plan,
@@ -402,7 +439,6 @@ export default function SubscriptionPlansPage() {
               return false
             }
 
-
             if (
               activeFilter ===
                 'ACTIVE' &&
@@ -410,7 +446,6 @@ export default function SubscriptionPlansPage() {
             ) {
               return false
             }
-
 
             if (
               activeFilter ===
@@ -420,33 +455,28 @@ export default function SubscriptionPlansPage() {
               return false
             }
 
-
             if (
               !query
             ) {
               return true
             }
 
-
-            const haystack =
-              [
-                plan.title,
-                plan.description,
-                plan.tier,
-                ...plan.tags,
-                ...plan.features,
-              ]
-                .join(
-                  ' ',
-                )
-                .toLocaleLowerCase(
-                  'fa-IR',
-                )
-
-
-            return haystack.includes(
-              query,
-            )
+            return [
+              plan.title,
+              plan.description,
+              plan.tier,
+              ...plan.tags,
+              ...plan.features,
+            ]
+              .join(
+                ' ',
+              )
+              .toLocaleLowerCase(
+                'fa-IR',
+              )
+              .includes(
+                query,
+              )
           },
         )
       },
@@ -460,94 +490,77 @@ export default function SubscriptionPlansPage() {
     )
 
 
-  function openCreate() {
+  async function handleSaveTrial() {
+    const parsed =
+      Number(
+        trialDays,
+      )
+
     if (
-      !options
+      !Number.isInteger(
+        parsed,
+      ) ||
+      parsed <
+        1 ||
+      parsed >
+        365
     ) {
-      setError(
-        'ابتدا تنظیمات پلن‌ها باید از Backend دریافت شود.',
+      setTrialError(
+        'تعداد روزهای رایگان باید بین ۱ تا ۳۶۵ روز باشد.',
       )
 
       return
     }
 
+    try {
+      setSavingTrial(
+        true,
+      )
 
-    setEditingPlan(
-      null,
-    )
+      setTrialError(
+        null,
+      )
 
-    setFormOpen(
-      true,
-    )
+      setSuccess(
+        null,
+      )
 
-    setError(
-      null,
-    )
+      const settings =
+        await updateSubscriptionSettings(
+          parsed,
+        )
 
-    setSuccess(
-      null,
-    )
-  }
+      setTrialDays(
+        String(
+          settings.trialDays,
+        ),
+      )
 
-
-  function openEdit(
-    plan:
-      SubscriptionPlan,
-  ) {
-    if (
-      !options
+      setSuccess(
+        'مدت دوره رایگان با موفقیت ذخیره شد.',
+      )
+    } catch (
+      caughtError:
+        unknown
     ) {
-      return
+      setTrialError(
+        caughtError instanceof
+          Error
+          ? caughtError.message
+          : 'ذخیره دوره رایگان ناموفق بود.',
+      )
+    } finally {
+      setSavingTrial(
+        false,
+      )
     }
-
-
-    setEditingPlan(
-      plan,
-    )
-
-    setFormOpen(
-      true,
-    )
-
-    setError(
-      null,
-    )
-
-    setSuccess(
-      null,
-    )
   }
 
 
-  function closeForm() {
-    if (
-      saving
-    ) {
-      return
-    }
-
-
-    setFormOpen(
-      false,
-    )
-
-    setEditingPlan(
-      null,
-    )
-  }
-
-
-  async function handleSave(
+  async function handleSavePlan(
     input:
       SubscriptionPlanPayload,
   ) {
-    if (
-      saving
-    ) {
-      return
-    }
-
-
     try {
       setSaving(
         true,
@@ -561,7 +574,6 @@ export default function SubscriptionPlansPage() {
         null,
       )
 
-
       if (
         editingPlan
       ) {
@@ -570,24 +582,25 @@ export default function SubscriptionPlansPage() {
           input,
         )
 
-
         setSuccess(
-          'پلن اشتراکی با موفقیت ویرایش شد.',
+          'پلن با موفقیت ویرایش شد.',
         )
       } else {
         await createSubscriptionPlan(
           input,
         )
 
-
         setSuccess(
-          'پلن اشتراکی با موفقیت ساخته شد.',
+          'پلن با موفقیت ساخته شد.',
         )
       }
 
+      const nextPlans =
+        await getAdminSubscriptionPlans()
 
-      await refreshPlans()
-
+      setPlans(
+        nextPlans,
+      )
 
       setFormOpen(
         false,
@@ -604,7 +617,7 @@ export default function SubscriptionPlansPage() {
         caughtError instanceof
           Error
           ? caughtError.message
-          : 'ذخیره پلن اشتراکی ناموفق بود.',
+          : 'ذخیره پلن ناموفق بود.',
       )
 
       throw caughtError
@@ -616,34 +629,14 @@ export default function SubscriptionPlansPage() {
   }
 
 
-  async function handleToggleActive(
+  async function handleToggle(
     plan:
       SubscriptionPlan,
   ) {
-    if (
-      togglingId
-    ) {
-      return
-    }
-
-
-    const nextActive =
-      !plan.isActive
-
-
     try {
       setTogglingId(
         plan.id,
       )
-
-      setError(
-        null,
-      )
-
-      setSuccess(
-        null,
-      )
-
 
       const updated =
         await updateSubscriptionPlan(
@@ -651,10 +644,9 @@ export default function SubscriptionPlansPage() {
 
           {
             isActive:
-              nextActive,
+              !plan.isActive,
           },
         )
-
 
       setPlans(
         (
@@ -665,17 +657,10 @@ export default function SubscriptionPlansPage() {
               item,
             ) =>
               item.id ===
-              plan.id
+              updated.id
                 ? updated
                 : item,
           ),
-      )
-
-
-      setSuccess(
-        nextActive
-          ? 'پلن با موفقیت فعال شد.'
-          : 'پلن با موفقیت غیرفعال شد.',
       )
     } catch (
       caughtError:
@@ -710,69 +695,60 @@ export default function SubscriptionPlansPage() {
         dir="rtl"
         className="mx-auto max-w-7xl space-y-6"
       >
-        <section className="rounded-[26px] border border-zinc-200 bg-gradient-to-l from-violet-50 via-white to-blue-50 p-6 shadow-sm sm:p-7">
+        <section className="rounded-[26px] border border-zinc-200 bg-gradient-to-l from-violet-50 via-white to-blue-50 p-6 shadow-sm">
           <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-center">
             <div>
-              <div className="flex items-center gap-2">
-                <Package
-                  size={25}
-                  className="text-violet-600"
-                />
+              <p className="text-xs font-black text-violet-700">
+                اشتراک‌ها
+              </p>
 
-                <p className="text-sm font-black text-violet-700">
-                  اشتراک‌ها
-                </p>
-              </div>
-
-              <h1 className="mt-2 text-2xl font-black text-zinc-950 sm:text-3xl">
+              <h1 className="mt-1 text-2xl font-black text-zinc-950">
                 مدیریت پلن‌های اشتراکی
               </h1>
 
-              <p className="mt-2 max-w-3xl text-sm font-semibold leading-7 text-zinc-500">
-                پلن‌های قابل خرید را بسازید، ویژگی‌ها و tier واقعی Backend را انتخاب کنید و وضعیت انتشار آن‌ها را مدیریت کنید.
+              <p className="mt-2 text-sm font-semibold leading-7 text-zinc-500">
+                پلن‌های قابل خرید و مدت استفاده رایگان کاربران جدید را مدیریت کنید.
               </p>
             </div>
 
-
-            <div className="flex flex-wrap gap-2">
+            <div className="flex gap-2">
               <button
                 type="button"
                 disabled={
                   refreshing
                 }
                 onClick={() => {
-                  void loadAll()
+                  void loadData()
                 }}
-                className="inline-flex h-11 items-center gap-2 rounded-xl border border-zinc-300 bg-white px-4 text-sm font-black text-zinc-700 transition hover:bg-zinc-50 disabled:opacity-60"
+                className="inline-flex h-11 items-center gap-2 rounded-xl border border-zinc-300 bg-white px-4 text-sm font-black"
               >
-                {
-                  refreshing
-                    ? (
-                      <Loader2
-                        size={17}
-                        className="animate-spin"
-                      />
-                    )
-                    : (
-                      <RefreshCcw
-                        size={17}
-                      />
-                    )
-                }
+                <RefreshCcw
+                  size={17}
+                  className={
+                    refreshing
+                      ? 'animate-spin'
+                      : ''
+                  }
+                />
 
                 بروزرسانی
               </button>
-
 
               <button
                 type="button"
                 disabled={
                   !options
                 }
-                onClick={
-                  openCreate
-                }
-                className="inline-flex h-11 items-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-black text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={() => {
+                  setEditingPlan(
+                    null,
+                  )
+
+                  setFormOpen(
+                    true,
+                  )
+                }}
+                className="inline-flex h-11 items-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-black text-white"
               >
                 <Plus
                   size={18}
@@ -785,46 +761,85 @@ export default function SubscriptionPlansPage() {
         </section>
 
 
-        <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatCard
-            title="کل پلن‌ها"
-            value={
-              stats.total
-            }
-            icon={
-              Package
-            }
-          />
+        <section className="rounded-2xl border border-blue-200 bg-blue-50/70 p-5">
+          <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
+            <div>
+              <div className="flex items-center gap-2 text-blue-700">
+                <Gift
+                  size={20}
+                />
 
-          <StatCard
-            title="پلن فعال"
-            value={
-              stats.active
-            }
-            icon={
-              CheckCircle2
-            }
-          />
+                <h2 className="font-black">
+                  دوره رایگان ثبت‌نام اولیه
+                </h2>
+              </div>
 
-          <StatCard
-            title="پلن غیرفعال"
-            value={
-              stats.inactive
-            }
-            icon={
-              XCircle
-            }
-          />
+              <p className="mt-2 max-w-2xl text-sm font-semibold leading-7 text-slate-600">
+                هر وکیلی که برای اولین بار ثبت‌نام می‌کند، این تعداد روز دسترسی رایگان دریافت خواهد کرد.
+              </p>
+            </div>
 
-          <StatCard
-            title="سطوح استفاده‌شده"
-            value={
-              stats.tiers
-            }
-            icon={
-              Layers3
-            }
-          />
+            <div className="flex gap-2">
+              <div className="relative">
+                <input
+                  type="number"
+                  min={1}
+                  max={365}
+                  value={
+                    trialDays
+                  }
+                  onChange={(
+                    event,
+                  ) =>
+                    setTrialDays(
+                      event.target.value,
+                    )
+                  }
+                  className="h-11 w-40 rounded-xl border border-blue-200 bg-white px-3 pl-12 text-center font-black outline-none focus:border-blue-500"
+                  placeholder="14"
+                />
+
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-zinc-400">
+                  روز
+                </span>
+              </div>
+
+              <button
+                type="button"
+                disabled={
+                  savingTrial ||
+                  !trialDays
+                }
+                onClick={() => {
+                  void handleSaveTrial()
+                }}
+                className="inline-flex h-11 items-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-black text-white disabled:opacity-50"
+              >
+                {
+                  savingTrial &&
+                  (
+                    <Loader2
+                      size={16}
+                      className="animate-spin"
+                    />
+                  )
+                }
+
+                ذخیره
+              </button>
+            </div>
+          </div>
+
+          {
+            trialError &&
+            (
+              <p className="mt-3 text-xs font-bold text-red-600">
+                {
+                  trialError
+                }
+              </p>
+            )
+          }
         </section>
 
 
@@ -839,7 +854,6 @@ export default function SubscriptionPlansPage() {
           )
         }
 
-
         {
           success &&
           (
@@ -852,108 +866,140 @@ export default function SubscriptionPlansPage() {
         }
 
 
-        {
-          !options &&
-          !error &&
-          (
-            <ErrorState message="گزینه‌های tier و features از Backend دریافت نشده‌اند؛ ساخت یا ویرایش پلن غیرفعال است." />
-          )
-        }
+        <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatCard
+            icon={
+              Package
+            }
+            label="کل پلن‌ها"
+            value={
+              stats.total
+            }
+          />
+
+          <StatCard
+            icon={
+              CheckCircle2
+            }
+            label="فعال"
+            value={
+              stats.active
+            }
+          />
+
+          <StatCard
+            icon={
+              XCircle
+            }
+            label="غیرفعال"
+            value={
+              stats.inactive
+            }
+          />
+
+          <StatCard
+            icon={
+              Layers3
+            }
+            label="سطوح"
+            value={
+              stats.tiers
+            }
+          />
+        </section>
 
 
-        <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
-          <div className="grid gap-3 lg:grid-cols-[1fr_240px_220px]">
-            <div className="relative">
-              <Search
-                size={18}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400"
-              />
+        <section className="grid gap-3 rounded-2xl border border-zinc-200 bg-white p-4 lg:grid-cols-[1fr_220px_220px]">
+          <div className="relative">
+            <Search
+              size={18}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400"
+            />
 
-              <input
-                value={
-                  search
-                }
-                onChange={(
-                  event,
-                ) =>
-                  setSearch(
-                    event.target.value,
-                  )
-                }
-                placeholder="جستجو در عنوان، توضیحات، ویژگی یا برچسب..."
-                className="h-11 w-full rounded-xl border border-zinc-300 pr-11 pl-4 text-sm font-bold outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-              />
-            </div>
-
-
-            <select
+            <input
               value={
-                tierFilter
+                search
               }
               onChange={(
                 event,
               ) =>
-                setTierFilter(
+                setSearch(
                   event.target.value,
                 )
               }
-              className="h-11 rounded-xl border border-zinc-300 bg-white px-3 text-sm font-black outline-none focus:border-blue-500"
-            >
-              <option value="ALL">
-                همه سطح‌ها
-              </option>
-
-              {
-                options?.tiers.map(
-                  (
-                    tier,
-                  ) => (
-                    <option
-                      key={
-                        tier
-                      }
-                      value={
-                        tier
-                      }
-                    >
-                      {
-                        getTierLabel(
-                          tier,
-                        )
-                      }
-                    </option>
-                  ),
-                )
-              }
-            </select>
-
-
-            <select
-              value={
-                activeFilter
-              }
-              onChange={(
-                event,
-              ) =>
-                setActiveFilter(
-                  event.target.value as ActiveFilter,
-                )
-              }
-              className="h-11 rounded-xl border border-zinc-300 bg-white px-3 text-sm font-black outline-none focus:border-blue-500"
-            >
-              <option value="ALL">
-                همه وضعیت‌ها
-              </option>
-
-              <option value="ACTIVE">
-                فعال
-              </option>
-
-              <option value="INACTIVE">
-                غیرفعال
-              </option>
-            </select>
+              placeholder="جستجو در پلن‌ها..."
+              className="h-11 w-full rounded-xl border border-zinc-300 pr-11 pl-4 text-sm font-bold outline-none focus:border-blue-500"
+            />
           </div>
+
+          <select
+            value={
+              tierFilter
+            }
+            onChange={(
+              event,
+            ) =>
+              setTierFilter(
+                event.target.value,
+              )
+            }
+            className="h-11 rounded-xl border border-zinc-300 bg-white px-3 text-sm font-bold"
+          >
+            <option value="ALL">
+              همه سطح‌ها
+            </option>
+
+            {
+              options?.tiers.map(
+                (
+                  tier,
+                ) => (
+                  <option
+                    key={
+                      tier
+                    }
+                    value={
+                      tier
+                    }
+                  >
+                    {
+                      TIER_LABELS[
+                        tier
+                      ] ??
+                      tier
+                    }
+                  </option>
+                ),
+              )
+            }
+          </select>
+
+          <select
+            value={
+              activeFilter
+            }
+            onChange={(
+              event,
+            ) =>
+              setActiveFilter(
+                event.target
+                  .value as ActiveFilter,
+              )
+            }
+            className="h-11 rounded-xl border border-zinc-300 bg-white px-3 text-sm font-bold"
+          >
+            <option value="ALL">
+              همه وضعیت‌ها
+            </option>
+
+            <option value="ACTIVE">
+              فعال
+            </option>
+
+            <option value="INACTIVE">
+              غیرفعال
+            </option>
+          </select>
         </section>
 
 
@@ -962,7 +1008,7 @@ export default function SubscriptionPlansPage() {
           0
             ? (
               <section className="rounded-2xl border border-zinc-200 bg-white">
-                <EmptyState message="پلن اشتراکی پیدا نشد." />
+                <EmptyState message="پلنی پیدا نشد." />
               </section>
             )
             : (
@@ -971,296 +1017,221 @@ export default function SubscriptionPlansPage() {
                   filteredPlans.map(
                     (
                       plan,
-                    ) => {
-                      const finalPrice =
-                        calculateFinalPrice(
-                          plan,
-                        )
-
-
-                      return (
-                        <article
-                          key={
-                            plan.id
-                          }
-                          className="rounded-[22px] border border-zinc-200 bg-white p-5 shadow-sm transition hover:border-blue-200 hover:shadow-md"
-                        >
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="min-w-0">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-black text-violet-700">
-                                  {
-                                    getTierLabel(
-                                      plan.tier,
-                                    )
-                                  }
-                                </span>
-
-
-                                <span
-                                  className={`rounded-full border px-2.5 py-1 text-[11px] font-black ${
-                                    plan.isActive
-                                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                                      : 'border-zinc-200 bg-zinc-100 text-zinc-500'
-                                  }`}
-                                >
-                                  {
-                                    plan.isActive
-                                      ? 'فعال'
-                                      : 'غیرفعال'
-                                  }
-                                </span>
-                              </div>
-
-
-                              <h2 className="mt-3 text-xl font-black text-zinc-950">
+                    ) => (
+                      <article
+                        key={
+                          plan.id
+                        }
+                        className="rounded-[22px] border border-zinc-200 bg-white p-5 shadow-sm"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <div className="flex flex-wrap gap-2">
+                              <span className="rounded-full bg-violet-50 px-2.5 py-1 text-[11px] font-black text-violet-700">
                                 {
-                                  plan.title
+                                  TIER_LABELS[
+                                    plan.tier
+                                  ] ??
+                                  plan.tier
                                 }
-                              </h2>
+                              </span>
 
-
-                              <p className="mt-2 line-clamp-3 text-sm font-semibold leading-7 text-zinc-500">
+                              <span
+                                className={`rounded-full px-2.5 py-1 text-[11px] font-black ${
+                                  plan.isActive
+                                    ? 'bg-emerald-50 text-emerald-700'
+                                    : 'bg-zinc-100 text-zinc-500'
+                                }`}
+                              >
                                 {
-                                  plan.description
+                                  plan.isActive
+                                    ? 'فعال'
+                                    : 'غیرفعال'
                                 }
-                              </p>
+                              </span>
                             </div>
 
-
-                            <div className="shrink-0 text-left">
+                            <h2 className="mt-3 text-xl font-black">
                               {
-                                plan.discountPercent >
-                                0 &&
-                                (
-                                  <p className="text-xs font-bold text-zinc-400 line-through">
-                                    {
-                                      formatNumber(
-                                        plan.price,
-                                      )
-                                    }
-                                  </p>
-                                )
+                                plan.title
                               }
+                            </h2>
 
-                              <p className="text-xl font-black text-emerald-700">
-                                {
-                                  formatNumber(
-                                    finalPrice,
-                                  )
-                                }
-                              </p>
-
+                            <p className="mt-2 text-sm font-semibold leading-7 text-zinc-500">
                               {
-                                plan.discountPercent >
-                                0 &&
-                                (
-                                  <p className="mt-1 text-[11px] font-black text-red-600">
-                                    {
-                                      formatNumber(
-                                        plan.discountPercent,
-                                      )
-                                    }
-                                    ٪ تخفیف
-                                  </p>
-                                )
+                                plan.description
                               }
-                            </div>
+                            </p>
                           </div>
 
-
-                          <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                            <InfoBox
-                              icon={
-                                Clock3
-                              }
-                              label="مدت"
-                              value={`${formatNumber(
-                                plan.durationMonths,
-                              )} ماه`}
-                            />
-
-                            <InfoBox
-                              icon={
-                                CircleDollarSign
-                              }
-                              label="قیمت پایه"
-                              value={
-                                formatNumber(
-                                  plan.price,
-                                )
-                              }
-                            />
-
-                            <InfoBox
-                              icon={
-                                Layers3
-                              }
-                              label="اولویت"
-                              value={
-                                formatNumber(
-                                  plan.sortOrder,
-                                )
-                              }
-                            />
-                          </div>
-
-
-                          {
-                            plan.tags.length >
-                            0 &&
-                            (
-                              <div className="mt-4">
-                                <div className="flex items-center gap-1.5 text-xs font-black text-zinc-500">
-                                  <Tags
-                                    size={14}
-                                  />
-
-                                  برچسب‌ها
-                                </div>
-
-                                <div className="mt-2 flex flex-wrap gap-1.5">
+                          <div className="shrink-0 text-left">
+                            {
+                              plan.discountPercent >
+                              0 &&
+                              (
+                                <p className="text-xs text-zinc-400 line-through">
                                   {
-                                    plan.tags.map(
-                                      (
-                                        tag,
-                                      ) => (
-                                        <span
-                                          key={
-                                            tag
-                                          }
-                                          className="rounded-full bg-zinc-100 px-2.5 py-1 text-[11px] font-bold text-zinc-600"
-                                        >
-                                          {
-                                            tag
-                                          }
-                                        </span>
-                                      ),
+                                    formatPrice(
+                                      plan.price,
                                     )
                                   }
-                                </div>
-                              </div>
-                            )
-                          }
+                                </p>
+                              )
+                            }
 
+                            <p className="text-xl font-black text-emerald-700">
+                              {
+                                formatPrice(
+                                  finalPrice(
+                                    plan,
+                                  ),
+                                )
+                              }
+                            </p>
+                          </div>
+                        </div>
 
-                          <div className="mt-4">
-                            <p className="text-xs font-black text-zinc-500">
+                        <div className="mt-5 grid grid-cols-2 gap-2">
+                          <div className="rounded-xl bg-zinc-50 p-3">
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-400">
+                              <Clock3
+                                size={14}
+                              />
+
+                              مدت
+                            </div>
+
+                            <p className="mt-2 font-black">
+                              {
+                                formatDuration(
+                                  plan.durationDays,
+                                )
+                              }
+                            </p>
+                          </div>
+
+                          <div className="rounded-xl bg-zinc-50 p-3">
+                            <p className="text-xs font-bold text-zinc-400">
                               قابلیت‌ها
                             </p>
 
-                            <div className="mt-2 flex flex-wrap gap-1.5">
+                            <p className="mt-2 font-black">
                               {
-                                plan.features.map(
-                                  (
-                                    featureCode,
-                                  ) => {
-                                    const feature =
-                                      options?.features.find(
-                                        (
-                                          item,
-                                        ) =>
-                                          item.code ===
-                                          featureCode,
-                                      )
-
-
-                                    return (
-                                      <span
-                                        key={
-                                          featureCode
-                                        }
-                                        title={
-                                          feature?.description
-                                        }
-                                        className="rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[11px] font-black text-blue-700"
-                                      >
-                                        {
-                                          feature?.title ||
-                                          featureCode
-                                        }
-                                      </span>
-                                    )
-                                  },
+                                formatNumber(
+                                  plan.features.length,
                                 )
                               }
-                            </div>
+                            </p>
                           </div>
+                        </div>
 
-
-                          <div className="mt-5 grid gap-2 sm:grid-cols-2">
-                            <button
-                              type="button"
-                              disabled={
-                                !options ||
-                                togglingId ===
-                                  plan.id
-                              }
-                              onClick={() =>
-                                openEdit(
-                                  plan,
-                                )
-                              }
-                              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 text-sm font-black text-white transition hover:bg-slate-800 disabled:opacity-50"
-                            >
-                              <Pencil
-                                size={16}
-                              />
-
-                              ویرایش پلن
-                            </button>
-
-
-                            <button
-                              type="button"
-                              disabled={
-                                togglingId !==
-                                null
-                              }
-                              onClick={() => {
-                                void handleToggleActive(
-                                  plan,
-                                )
-                              }}
-                              className={`inline-flex h-11 items-center justify-center gap-2 rounded-xl border px-4 text-sm font-black transition disabled:opacity-50 ${
-                                plan.isActive
-                                  ? 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100'
-                                  : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                              }`}
-                            >
-                              {
-                                togglingId ===
-                                plan.id
-                                  ? (
-                                    <Loader2
-                                      size={16}
-                                      className="animate-spin"
-                                    />
+                        <div className="mt-4 flex flex-wrap gap-1.5">
+                          {
+                            plan.features.map(
+                              (
+                                featureCode,
+                              ) => {
+                                const feature =
+                                  options?.features.find(
+                                    (
+                                      item,
+                                    ) =>
+                                      item.code ===
+                                      featureCode,
                                   )
-                                  : (
-                                    <Power
-                                      size={16}
-                                    />
-                                  )
-                              }
 
-                              {
-                                plan.isActive
-                                  ? 'غیرفعال کردن'
-                                  : 'فعال کردن'
-                              }
-                            </button>
-                          </div>
-                        </article>
-                      )
-                    },
+                                return (
+                                  <span
+                                    key={
+                                      featureCode
+                                    }
+                                    title={
+                                      feature
+                                        ?.description
+                                    }
+                                    className="rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700"
+                                  >
+                                    {
+                                      feature
+                                        ?.title ??
+                                      featureCode
+                                    }
+                                  </span>
+                                )
+                              },
+                            )
+                          }
+                        </div>
+
+                        <div className="mt-5 grid gap-2 sm:grid-cols-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingPlan(
+                                plan,
+                              )
+
+                              setFormOpen(
+                                true,
+                              )
+                            }}
+                            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-slate-900 text-sm font-black text-white"
+                          >
+                            <Pencil
+                              size={16}
+                            />
+
+                            ویرایش
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={
+                              togglingId !==
+                              null
+                            }
+                            onClick={() => {
+                              void handleToggle(
+                                plan,
+                              )
+                            }}
+                            className={`inline-flex h-11 items-center justify-center gap-2 rounded-xl border text-sm font-black ${
+                              plan.isActive
+                                ? 'border-red-200 bg-red-50 text-red-700'
+                                : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                            }`}
+                          >
+                            {
+                              togglingId ===
+                              plan.id
+                                ? (
+                                  <Loader2
+                                    size={16}
+                                    className="animate-spin"
+                                  />
+                                )
+                                : (
+                                  <Power
+                                    size={16}
+                                  />
+                                )
+                            }
+
+                            {
+                              plan.isActive
+                                ? 'غیرفعال کردن'
+                                : 'فعال کردن'
+                            }
+                          </button>
+                        </div>
+                      </article>
+                    ),
                   )
                 }
               </section>
             )
         }
       </div>
-
 
       {
         options &&
@@ -1278,11 +1249,23 @@ export default function SubscriptionPlansPage() {
             saving={
               saving
             }
-            onClose={
-              closeForm
-            }
+            onClose={() => {
+              if (
+                saving
+              ) {
+                return
+              }
+
+              setFormOpen(
+                false,
+              )
+
+              setEditingPlan(
+                null,
+              )
+            }}
             onSubmit={
-              handleSave
+              handleSavePlan
             }
           />
         )
@@ -1293,19 +1276,19 @@ export default function SubscriptionPlansPage() {
 
 
 function StatCard({
-  title,
-  value,
   icon:
     Icon,
+  label,
+  value,
 }: {
-  title:
+  icon:
+    LucideIcon
+
+  label:
     string
 
   value:
     number
-
-  icon:
-    typeof Package
 }) {
   return (
     <article className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
@@ -1316,11 +1299,11 @@ function StatCard({
         />
 
         {
-          title
+          label
         }
       </div>
 
-      <p className="mt-3 text-2xl font-black text-zinc-950">
+      <p className="mt-3 text-2xl font-black">
         {
           formatNumber(
             value,
@@ -1328,42 +1311,5 @@ function StatCard({
         }
       </p>
     </article>
-  )
-}
-
-
-function InfoBox({
-  icon:
-    Icon,
-  label,
-  value,
-}: {
-  icon:
-    typeof Package
-
-  label:
-    string
-
-  value:
-    string
-}) {
-  return (
-    <div className="rounded-xl bg-zinc-50 p-3">
-      <div className="flex items-center gap-1.5 text-[11px] font-bold text-zinc-400">
-        <Icon
-          size={13}
-        />
-
-        {
-          label
-        }
-      </div>
-
-      <p className="mt-1.5 text-sm font-black text-zinc-800">
-        {
-          value
-        }
-      </p>
-    </div>
   )
 }

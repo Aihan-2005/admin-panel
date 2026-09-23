@@ -2,6 +2,7 @@
 
 import {
   type FormEvent,
+  type ReactNode,
   useEffect,
   useMemo,
   useState,
@@ -18,6 +19,7 @@ import {
 } from 'lucide-react'
 
 import type {
+  SubscriptionDurationUnit,
   SubscriptionPlan,
   SubscriptionPlanOptions,
   SubscriptionPlanPayload,
@@ -63,8 +65,11 @@ interface FormState {
   tags:
     string
 
-  durationMonths:
+  durationValue:
     string
+
+  durationUnit:
+    SubscriptionDurationUnit
 
   price:
     string
@@ -107,6 +112,201 @@ const TEXTAREA_CLASS =
   'w-full resize-y rounded-xl border border-zinc-300 bg-white p-3 text-sm font-semibold leading-7 text-zinc-900 outline-none transition placeholder:font-normal placeholder:text-zinc-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-zinc-100'
 
 
+function normalizeDigits(
+  value:
+    string,
+): string {
+  return value
+    .replace(
+      /[۰-۹]/g,
+      (
+        digit,
+      ) =>
+        String(
+          '۰۱۲۳۴۵۶۷۸۹'
+            .indexOf(
+              digit,
+            ),
+        ),
+    )
+    .replace(
+      /[٠-٩]/g,
+      (
+        digit,
+      ) =>
+        String(
+          '٠١٢٣٤٥٦٧٨٩'
+            .indexOf(
+              digit,
+            ),
+        ),
+    )
+}
+
+
+function digitsOnly(
+  value:
+    string,
+): string {
+  return normalizeDigits(
+    value,
+  ).replace(
+    /\D/g,
+    '',
+  )
+}
+
+
+function formatMoneyInput(
+  value:
+    string,
+): string {
+  const digits =
+    digitsOnly(
+      value,
+    )
+
+  if (
+    !digits
+  ) {
+    return ''
+  }
+
+  const numeric =
+    Number(
+      digits,
+    )
+
+  if (
+    !Number.isSafeInteger(
+      numeric,
+    )
+  ) {
+    return digits
+  }
+
+  return new Intl.NumberFormat(
+    'en-US',
+  ).format(
+    numeric,
+  )
+}
+
+
+function parseInteger(
+  value:
+    string,
+): number | null {
+  const normalized =
+    digitsOnly(
+      value,
+    )
+
+  if (
+    !normalized
+  ) {
+    return null
+  }
+
+  const parsed =
+    Number(
+      normalized,
+    )
+
+  return Number.isSafeInteger(
+    parsed,
+  )
+    ? parsed
+    : null
+}
+
+
+function parseTags(
+  value:
+    string,
+): string[] {
+  return Array.from(
+    new Set(
+      value
+        .split(
+          /[,،]/,
+        )
+        .map(
+          (
+            item,
+          ) =>
+            item.trim(),
+        )
+        .filter(
+          Boolean,
+        ),
+    ),
+  )
+}
+
+
+function getDurationFormValue(
+  durationDays:
+    number,
+): {
+  value:
+    string
+
+  unit:
+    SubscriptionDurationUnit
+} {
+  if (
+    durationDays %
+      30 ===
+    0
+  ) {
+    return {
+      value:
+        String(
+          durationDays /
+            30,
+        ),
+
+      unit:
+        'MONTH',
+    }
+  }
+
+  if (
+    durationDays %
+      7 ===
+    0
+  ) {
+    return {
+      value:
+        String(
+          durationDays /
+            7,
+        ),
+
+      unit:
+        'WEEK',
+    }
+  }
+
+  return {
+    value:
+      String(
+        Math.max(
+          1,
+          Math.round(
+            durationDays /
+              7,
+          ),
+        ),
+      ),
+
+    unit:
+      'WEEK',
+  }
+}
+
+
 function createInitialState(
   plan:
     SubscriptionPlan | null,
@@ -117,6 +317,11 @@ function createInitialState(
   if (
     plan
   ) {
+    const duration =
+      getDurationFormValue(
+        plan.durationDays,
+      )
+
     return {
       title:
         plan.title,
@@ -132,14 +337,17 @@ function createInitialState(
           '، ',
         ),
 
-      durationMonths:
-        String(
-          plan.durationMonths,
-        ),
+      durationValue:
+        duration.value,
+
+      durationUnit:
+        duration.unit,
 
       price:
-        String(
-          plan.price,
+        formatMoneyInput(
+          String(
+            plan.price,
+          ),
         ),
 
       discountPercent:
@@ -161,7 +369,6 @@ function createInitialState(
     }
   }
 
-
   return {
     title:
       '',
@@ -176,11 +383,14 @@ function createInitialState(
     tags:
       '',
 
-    durationMonths:
+    durationValue:
       '1',
 
+    durationUnit:
+      'MONTH',
+
     price:
-      '0',
+      '',
 
     discountPercent:
       '0',
@@ -194,94 +404,6 @@ function createInitialState(
     sortOrder:
       '0',
   }
-}
-
-
-function parseInteger(
-  value:
-    string,
-): number | null {
-  const normalized =
-    value.trim()
-
-
-  if (
-    !/^\d+$/.test(
-      normalized,
-    )
-  ) {
-    return null
-  }
-
-
-  const parsed =
-    Number(
-      normalized,
-    )
-
-
-  return Number.isSafeInteger(
-    parsed,
-  )
-    ? parsed
-    : null
-}
-
-
-function parseTags(
-  value:
-    string,
-): string[] {
-  const normalized =
-    value
-      .split(
-        /[,،]/,
-      )
-      .map(
-        (
-          item,
-        ) =>
-          item.trim(),
-      )
-      .filter(
-        Boolean,
-      )
-
-
-  const result:
-    string[] = []
-
-  const seen =
-    new Set<string>()
-
-
-  for (
-    const tag of normalized
-  ) {
-    const key =
-      tag.toLocaleLowerCase()
-
-
-    if (
-      seen.has(
-        key,
-      )
-    ) {
-      continue
-    }
-
-
-    seen.add(
-      key,
-    )
-
-    result.push(
-      tag,
-    )
-  }
-
-
-  return result
 }
 
 
@@ -305,7 +427,6 @@ export default function SubscriptionPlanFormModal({
         ),
     )
 
-
   const [
     error,
     setError,
@@ -322,7 +443,6 @@ export default function SubscriptionPlanFormModal({
       ) {
         return
       }
-
 
       setForm(
         createInitialState(
@@ -352,11 +472,9 @@ export default function SubscriptionPlanFormModal({
         return
       }
 
-
       const previousOverflow =
         document.body.style
           .overflow
-
 
       const handleKeyDown =
         (
@@ -372,23 +490,19 @@ export default function SubscriptionPlanFormModal({
           }
         }
 
-
       document.body.style
         .overflow =
         'hidden'
-
 
       window.addEventListener(
         'keydown',
         handleKeyDown,
       )
 
-
       return () => {
         document.body.style
           .overflow =
           previousOverflow
-
 
         window.removeEventListener(
           'keydown',
@@ -463,33 +577,27 @@ export default function SubscriptionPlanFormModal({
     setForm(
       (
         current,
-      ) => {
-        const exists =
+      ) => ({
+        ...current,
+
+        features:
           current.features
             .includes(
               code,
             )
-
-
-        return {
-          ...current,
-
-          features:
-            exists
-              ? current.features
-                  .filter(
-                    (
-                      item,
-                    ) =>
-                      item !==
-                      code,
-                  )
-              : [
-                  ...current.features,
-                  code,
-                ],
-        }
-      },
+            ? current.features
+                .filter(
+                  (
+                    item,
+                  ) =>
+                    item !==
+                    code,
+                )
+            : [
+                ...current.features,
+                code,
+              ],
+      }),
     )
 
     setError(
@@ -504,21 +612,17 @@ export default function SubscriptionPlanFormModal({
   ) {
     event.preventDefault()
 
-
     if (
       saving
     ) {
       return
     }
 
-
     const title =
       form.title.trim()
 
-
     const description =
       form.description.trim()
-
 
     if (
       !title
@@ -530,18 +634,16 @@ export default function SubscriptionPlanFormModal({
       return
     }
 
-
     if (
       title.length >
       120
     ) {
       setError(
-        'عنوان پلن نمی‌تواند بیشتر از ۱۲۰ کاراکتر باشد.',
+        'عنوان پلن حداکثر ۱۲۰ کاراکتر است.',
       )
 
       return
     }
-
 
     if (
       !description
@@ -553,18 +655,16 @@ export default function SubscriptionPlanFormModal({
       return
     }
 
-
     if (
       description.length >
       2000
     ) {
       setError(
-        'توضیحات پلن نمی‌تواند بیشتر از ۲۰۰۰ کاراکتر باشد.',
+        'توضیحات پلن حداکثر ۲۰۰۰ کاراکتر است.',
       )
 
       return
     }
-
 
     if (
       !options.tiers.includes(
@@ -572,18 +672,16 @@ export default function SubscriptionPlanFormModal({
       )
     ) {
       setError(
-        'سطح انتخاب‌شده توسط Backend معتبر نیست.',
+        'سطح انتخاب‌شده معتبر نیست.',
       )
 
       return
     }
 
-
     const tags =
       parseTags(
         form.tags,
       )
-
 
     if (
       tags.length >
@@ -596,51 +694,47 @@ export default function SubscriptionPlanFormModal({
       return
     }
 
-
-    if (
-      tags.some(
-        (
-          tag,
-        ) =>
-          tag.length >
-          50,
-      )
-    ) {
-      setError(
-        'هر برچسب حداکثر می‌تواند ۵۰ کاراکتر باشد.',
-      )
-
-      return
-    }
-
-
-    const durationMonths =
+    const durationValue =
       parseInteger(
-        form.durationMonths,
+        form.durationValue,
       )
 
-
     if (
-      durationMonths ===
+      durationValue ===
         null ||
-      durationMonths <
-        1 ||
-      durationMonths >
-        120
+      durationValue <
+        1
     ) {
       setError(
-        'مدت پلن باید عددی صحیح بین ۱ تا ۱۲۰ ماه باشد.',
+        'مدت اشتراک را به‌صورت عدد صحیح وارد کنید.',
       )
 
       return
     }
 
+    const durationDays =
+      form.durationUnit ===
+      'WEEK'
+        ? durationValue *
+          7
+        : durationValue *
+          30
+
+    if (
+      durationDays >
+      3600
+    ) {
+      setError(
+        'مدت اشتراک بیش از حد مجاز است.',
+      )
+
+      return
+    }
 
     const price =
       parseInteger(
         form.price,
       )
-
 
     if (
       price ===
@@ -649,18 +743,16 @@ export default function SubscriptionPlanFormModal({
         0
     ) {
       setError(
-        'قیمت باید یک عدد صحیح صفر یا بزرگ‌تر باشد.',
+        'مبلغ پلن را به‌درستی وارد کنید.',
       )
 
       return
     }
 
-
     const discountPercent =
       parseInteger(
         form.discountPercent,
       )
-
 
     if (
       discountPercent ===
@@ -677,12 +769,10 @@ export default function SubscriptionPlanFormModal({
       return
     }
 
-
     const sortOrder =
       parseInteger(
         form.sortOrder,
       )
-
 
     if (
       sortOrder ===
@@ -691,12 +781,11 @@ export default function SubscriptionPlanFormModal({
         0
     ) {
       setError(
-        'اولویت نمایش باید یک عدد صحیح صفر یا بزرگ‌تر باشد.',
+        'اولویت نمایش باید صفر یا بیشتر باشد.',
       )
 
       return
     }
-
 
     const features =
       Array.from(
@@ -704,7 +793,6 @@ export default function SubscriptionPlanFormModal({
           form.features,
         ),
       )
-
 
     if (
       features.length ===
@@ -716,7 +804,6 @@ export default function SubscriptionPlanFormModal({
 
       return
     }
-
 
     if (
       features.some(
@@ -730,12 +817,11 @@ export default function SubscriptionPlanFormModal({
       )
     ) {
       setError(
-        'یکی از قابلیت‌های انتخاب‌شده دیگر توسط Backend پشتیبانی نمی‌شود.',
+        'یکی از قابلیت‌های انتخاب‌شده معتبر نیست.',
       )
 
       return
     }
-
 
     await onSubmit({
       title,
@@ -747,7 +833,7 @@ export default function SubscriptionPlanFormModal({
 
       tags,
 
-      durationMonths,
+      durationDays,
 
       price,
 
@@ -809,13 +895,8 @@ export default function SubscriptionPlanFormModal({
                     : 'ساخت پلن اشتراکی'
                 }
               </h2>
-
-              <p className="mt-1 text-xs font-semibold text-zinc-500">
-                tier و featureها مستقیماً از Backend دریافت شده‌اند.
-              </p>
             </div>
           </div>
-
 
           <button
             type="button"
@@ -834,14 +915,13 @@ export default function SubscriptionPlanFormModal({
           </button>
         </header>
 
-
         <form
           onSubmit={
             handleSubmit
           }
           className="min-h-0 flex-1 overflow-y-auto"
         >
-          <div className="space-y-6 p-5 sm:p-6">
+          <div className="space-y-7 p-5 sm:p-6">
             <section>
               <SectionTitle>
                 اطلاعات اصلی
@@ -867,13 +947,12 @@ export default function SubscriptionPlanFormModal({
                     maxLength={
                       120
                     }
-                    placeholder="مثلاً پلن پایه"
+                    placeholder="مثلاً پلن یک‌ماهه"
                     className={
                       INPUT_CLASS
                     }
                   />
                 </Field>
-
 
                 <Field label="سطح پلن">
                   <select
@@ -911,9 +990,8 @@ export default function SubscriptionPlanFormModal({
                             {
                               TIER_LABELS[
                                 tier
-                              ]
-                                ? `${TIER_LABELS[tier]} — ${tier}`
-                                : tier
+                              ] ??
+                              tier
                             }
                           </option>
                         ),
@@ -922,7 +1000,6 @@ export default function SubscriptionPlanFormModal({
                   </select>
                 </Field>
               </div>
-
 
               <div className="mt-4">
                 <Field label="توضیحات">
@@ -947,7 +1024,7 @@ export default function SubscriptionPlanFormModal({
                     maxLength={
                       2000
                     }
-                    placeholder="توضیحی که برای این پلن نمایش داده می‌شود..."
+                    placeholder="توضیح کوتاه و شفاف درباره این پلن..."
                     className={
                       TEXTAREA_CLASS
                     }
@@ -955,11 +1032,10 @@ export default function SubscriptionPlanFormModal({
                 </Field>
               </div>
 
-
               <div className="mt-4">
                 <Field
                   label="برچسب‌ها"
-                  hint="با ویرگول فارسی یا انگلیسی جدا کنید؛ حداکثر ۱۰ مورد."
+                  hint="با ویرگول جدا کنید؛ مانند محبوب، پیشنهاد ویژه"
                 >
                   <input
                     value={
@@ -976,7 +1052,6 @@ export default function SubscriptionPlanFormModal({
                     disabled={
                       saving
                     }
-                    placeholder="پیشنهادی، محبوب، مناسب شروع"
                     className={
                       INPUT_CLASS
                     }
@@ -985,88 +1060,113 @@ export default function SubscriptionPlanFormModal({
               </div>
             </section>
 
-
             <section className="border-t border-zinc-200 pt-6">
               <SectionTitle>
-                مدت، قیمت و نمایش
+                مدت و قیمت
               </SectionTitle>
 
-              <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <Field label="مدت اشتراک (ماه)">
-                  <input
-                    type="number"
-                    min={
-                      1
-                    }
-                    max={
-                      120
-                    }
-                    step={
-                      1
-                    }
-                    value={
-                      form.durationMonths
-                    }
-                    onChange={(
-                      event,
-                    ) =>
-                      setField(
-                        'durationMonths',
-                        event.target.value,
-                      )
-                    }
-                    disabled={
-                      saving
-                    }
-                    className={
-                      INPUT_CLASS
-                    }
-                  />
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <Field label="مدت اشتراک">
+                  <div className="grid grid-cols-[1fr_130px] gap-2">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={
+                        form.durationValue
+                      }
+                      onChange={(
+                        event,
+                      ) =>
+                        setField(
+                          'durationValue',
+                          digitsOnly(
+                            event.target.value,
+                          ),
+                        )
+                      }
+                      disabled={
+                        saving
+                      }
+                      placeholder="مثلاً ۲"
+                      className={
+                        INPUT_CLASS
+                      }
+                    />
+
+                    <select
+                      value={
+                        form.durationUnit
+                      }
+                      disabled={
+                        saving
+                      }
+                      onChange={(
+                        event,
+                      ) =>
+                        setField(
+                          'durationUnit',
+                          event.target
+                            .value as SubscriptionDurationUnit,
+                        )
+                      }
+                      className={
+                        INPUT_CLASS
+                      }
+                    >
+                      <option value="WEEK">
+                        هفته
+                      </option>
+
+                      <option value="MONTH">
+                        ماه
+                      </option>
+                    </select>
+                  </div>
+
+                  <p className="mt-2 text-[11px] font-semibold text-zinc-400">
+                    مثال: ۲ هفته، ۱ ماه، ۳ ماه یا ۶ ماه
+                  </p>
                 </Field>
 
+                <Field
+                  label="قیمت پلن"
+                  hint="مبلغ را به تومان وارد کنید."
+                >
+                  <div className="relative">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      dir="ltr"
+                      value={
+                        form.price
+                      }
+                      onChange={(
+                        event,
+                      ) =>
+                        setField(
+                          'price',
+                          formatMoneyInput(
+                            event.target.value,
+                          ),
+                        )
+                      }
+                      disabled={
+                        saving
+                      }
+                      placeholder="1,500,000"
+                      className={`${INPUT_CLASS} pl-16 text-left`}
+                    />
 
-                <Field label="قیمت">
-                  <input
-                    type="number"
-                    min={
-                      0
-                    }
-                    step={
-                      1
-                    }
-                    value={
-                      form.price
-                    }
-                    onChange={(
-                      event,
-                    ) =>
-                      setField(
-                        'price',
-                        event.target.value,
-                      )
-                    }
-                    disabled={
-                      saving
-                    }
-                    className={
-                      INPUT_CLASS
-                    }
-                  />
+                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black text-zinc-400">
+                      تومان
+                    </span>
+                  </div>
                 </Field>
-
 
                 <Field label="درصد تخفیف">
                   <input
-                    type="number"
-                    min={
-                      0
-                    }
-                    max={
-                      100
-                    }
-                    step={
-                      1
-                    }
+                    type="text"
+                    inputMode="numeric"
                     value={
                       form.discountPercent
                     }
@@ -1075,7 +1175,9 @@ export default function SubscriptionPlanFormModal({
                     ) =>
                       setField(
                         'discountPercent',
-                        event.target.value,
+                        digitsOnly(
+                          event.target.value,
+                        ),
                       )
                     }
                     disabled={
@@ -1087,19 +1189,13 @@ export default function SubscriptionPlanFormModal({
                   />
                 </Field>
 
-
                 <Field
                   label="اولویت نمایش"
                   hint="عدد کمتر زودتر نمایش داده می‌شود."
                 >
                   <input
-                    type="number"
-                    min={
-                      0
-                    }
-                    step={
-                      1
-                    }
+                    type="text"
+                    inputMode="numeric"
                     value={
                       form.sortOrder
                     }
@@ -1108,7 +1204,9 @@ export default function SubscriptionPlanFormModal({
                     ) =>
                       setField(
                         'sortOrder',
-                        event.target.value,
+                        digitsOnly(
+                          event.target.value,
+                        ),
                       )
                     }
                     disabled={
@@ -1122,12 +1220,17 @@ export default function SubscriptionPlanFormModal({
               </div>
             </section>
 
-
             <section className="border-t border-zinc-200 pt-6">
-              <div className="flex items-center justify-between gap-4">
-                <SectionTitle>
-                  قابلیت‌های پلن
-                </SectionTitle>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <SectionTitle>
+                    قابلیت‌های پلن
+                  </SectionTitle>
+
+                  <p className="mt-1 text-xs font-semibold text-zinc-500">
+                    قابلیت‌هایی که با این پلن در اختیار وکیل قرار می‌گیرند.
+                  </p>
+                </div>
 
                 <span className="rounded-full bg-violet-50 px-3 py-1 text-xs font-black text-violet-700">
                   {
@@ -1137,15 +1240,9 @@ export default function SubscriptionPlanFormModal({
                       )
                   }
                   {' '}
-                  انتخاب‌شده
+                  انتخاب
                 </span>
               </div>
-
-
-              <p className="mt-2 text-xs font-semibold leading-6 text-zinc-500">
-                فقط codeهایی که Backend از endpoint options برگردانده قابل انتخاب هستند.
-              </p>
-
 
               <div className="mt-4 grid gap-3 md:grid-cols-2">
                 {
@@ -1154,10 +1251,10 @@ export default function SubscriptionPlanFormModal({
                       feature,
                     ) => {
                       const selected =
-                        form.features.includes(
-                          feature.code,
-                        )
-
+                        form.features
+                          .includes(
+                            feature.code,
+                          )
 
                       return (
                         <button
@@ -1176,30 +1273,38 @@ export default function SubscriptionPlanFormModal({
                               feature.code,
                             )
                           }
-                          className={`group relative min-h-28 rounded-2xl border p-4 text-right transition ${
+                          className={`relative min-h-28 rounded-2xl border p-4 text-right transition ${
                             selected
                               ? 'border-violet-400 bg-violet-50 ring-2 ring-violet-100'
                               : 'border-zinc-200 bg-white hover:border-violet-200 hover:bg-violet-50/40'
-                          } disabled:cursor-not-allowed disabled:opacity-60`}
+                          }`}
                         >
                           <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
+                            <div>
                               <p className="font-black text-zinc-950">
                                 {
                                   feature.title
                                 }
                               </p>
 
-                              <p
-                                dir="ltr"
-                                className="mt-1 truncate text-right text-[11px] font-bold text-violet-600"
-                              >
-                                {
-                                  feature.code
-                                }
-                              </p>
-                            </div>
+                              {
+                                feature.description &&
+                                (
+                                  <div className="mt-2 flex items-start gap-1.5 text-xs font-semibold leading-6 text-zinc-500">
+                                    <Info
+                                      size={14}
+                                      className="mt-1 shrink-0"
+                                    />
 
+                                    <span>
+                                      {
+                                        feature.description
+                                      }
+                                    </span>
+                                  </div>
+                                )
+                              }
+                            </div>
 
                             <span
                               className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border ${
@@ -1213,25 +1318,6 @@ export default function SubscriptionPlanFormModal({
                               />
                             </span>
                           </div>
-
-
-                          {
-                            feature.description &&
-                            (
-                              <div className="mt-3 flex items-start gap-1.5 text-xs font-semibold leading-6 text-zinc-500">
-                                <Info
-                                  size={14}
-                                  className="mt-1 shrink-0"
-                                />
-
-                                <span>
-                                  {
-                                    feature.description
-                                  }
-                                </span>
-                              </div>
-                            )
-                          }
                         </button>
                       )
                     },
@@ -1240,7 +1326,6 @@ export default function SubscriptionPlanFormModal({
               </div>
             </section>
 
-
             <section className="border-t border-zinc-200 pt-6">
               <label className="flex cursor-pointer items-center justify-between gap-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
                 <div>
@@ -1248,11 +1333,10 @@ export default function SubscriptionPlanFormModal({
                     پلن فعال باشد
                   </p>
 
-                  <p className="mt-1 text-xs font-semibold leading-6 text-zinc-500">
-                    پلن فعال در endpoint عمومی قابل مشاهده و برای استفاده جدید در دسترس خواهد بود.
+                  <p className="mt-1 text-xs font-semibold text-zinc-500">
+                    پلن فعال در سایت برای انتخاب کاربران نمایش داده می‌شود.
                   </p>
                 </div>
-
 
                 <input
                   type="checkbox"
@@ -1270,16 +1354,15 @@ export default function SubscriptionPlanFormModal({
                       event.target.checked,
                     )
                   }
-                  className="h-5 w-5 shrink-0 accent-blue-600"
+                  className="h-5 w-5 accent-blue-600"
                 />
               </label>
             </section>
 
-
             {
               error &&
               (
-                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold leading-6 text-red-700">
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
                   {
                     error
                   }
@@ -1287,7 +1370,6 @@ export default function SubscriptionPlanFormModal({
               )
             }
           </div>
-
 
           <footer className="sticky bottom-0 flex items-center justify-end gap-2 border-t border-zinc-200 bg-white/95 px-5 py-4 backdrop-blur sm:px-6">
             <button
@@ -1298,18 +1380,17 @@ export default function SubscriptionPlanFormModal({
               onClick={
                 onClose
               }
-              className="h-11 rounded-xl border border-zinc-300 bg-white px-5 text-sm font-black text-zinc-700 transition hover:bg-zinc-50 disabled:opacity-50"
+              className="h-11 rounded-xl border border-zinc-300 px-5 text-sm font-black text-zinc-700"
             >
               انصراف
             </button>
-
 
             <button
               type="submit"
               disabled={
                 saving
               }
-              className="inline-flex h-11 items-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-black text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-11 items-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-black text-white transition hover:bg-blue-700 disabled:opacity-60"
             >
               {
                 saving
@@ -1352,7 +1433,7 @@ function SectionTitle({
   children,
 }: {
   children:
-    React.ReactNode
+    ReactNode
 }) {
   return (
     <h3 className="font-black text-zinc-950">
@@ -1376,7 +1457,7 @@ function Field({
     string
 
   children:
-    React.ReactNode
+    ReactNode
 }) {
   return (
     <label className="block">
