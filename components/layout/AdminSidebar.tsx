@@ -12,6 +12,7 @@ import type {
 
 import {
   CircleHelp,
+  CreditCard,
   LayoutDashboard,
   MessageSquareText,
   Package,
@@ -146,6 +147,20 @@ const navGroups:
           icon:
             Package,
         },
+
+        {
+          href:
+            '/payments',
+
+          label:
+            'پرداخت‌ها',
+
+          description:
+            'تراکنش‌ها و وضعیت فعال‌سازی',
+
+          icon:
+            CreditCard,
+        },
       ],
     },
 
@@ -276,7 +291,9 @@ export default function AdminSidebar({
             className="rounded-xl p-2 lg:hidden"
           >
             <X
-              size={21}
+              size={
+                21
+              }
             />
           </button>
         </div>
@@ -300,7 +317,6 @@ export default function AdminSidebar({
                       }
                     </p>
 
-
                     <div className="space-y-1.5">
                       {
                         group.items.map(
@@ -310,12 +326,10 @@ export default function AdminSidebar({
                             const Icon =
                               item.icon
 
-
                             const active =
                               isPathActive(
                                 item.href,
                               )
-
 
                             return (
                               <Link
@@ -347,7 +361,6 @@ export default function AdminSidebar({
                                     }
                                   />
                                 </span>
-
 
                                 <span className="min-w-0">
                                   <span className="block text-sm font-black">
@@ -386,7 +399,9 @@ export default function AdminSidebar({
           <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-3.5">
             <div className="flex items-center gap-2 text-emerald-800">
               <ShieldCheck
-                size={18}
+                size={
+                  18
+                }
               />
 
               <span className="text-xs font-black">

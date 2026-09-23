@@ -140,7 +140,32 @@ export const API_ENDPOINTS = {
     ) =>
       `/admin/subscription-plans/${id}`,
 
- 
-subscriptionSettings:
-  '/admin/subscription-plans/settings',
+  subscriptionSettings:
+    '/admin/subscription-plans/settings',
+
+    
+    
+  payments:
+    '/admin/payments',
+
+  payment:
+    (
+      id:
+        string,
+    ) =>
+      `/admin/payments/${id}`,
+
+  paymentReconcile:
+    (
+      id:
+        string,
+    ) =>
+      `/admin/payments/${id}/reconcile`,
+
+  paymentRetryFulfillment:
+    (
+      id:
+        string,
+    ) =>
+      `/admin/payments/${id}/retry-fulfillment`,
 } as const
